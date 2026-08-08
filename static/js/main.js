@@ -1,0 +1,40 @@
+/**
+ * main.js — the only script the page loads directly.
+ *
+ * Each enhancement is independent and optional: one throwing must not stop the
+ * others, and none of them is required for the page to work. That is the whole
+ * client-side architecture.
+ */
+
+import { initNav } from "./nav.js";
+import { initTypewriter } from "./typewriter.js";
+import { initReveal } from "./reveal.js";
+import { initContactForm } from "./contact.js";
+
+function attempt(name, start) {
+  try {
+    start();
+  } catch (error) {
+    console.warn(`[pmd] ${name} enhancement unavailable`, error);
+  }
+}
+
+attempt("navigation", initNav);
+attempt("typewriter", initTypewriter);
+attempt("reveal", initReveal);
+attempt("contact form", initContactForm);
+
+// The night sky is the heaviest enhancement and the least important, so it is
+// loaded on its own, after everything else, and only when it will be used.
+if (!globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  const load = () =>
+    import("./sky.js")
+      .then((module) => module.initSky())
+      .catch((error) => console.warn("[pmd] sky unavailable", error));
+
+  if ("requestIdleCallback" in globalThis) {
+    globalThis.requestIdleCallback(load, { timeout: 2500 });
+  } else {
+    globalThis.addEventListener("load", () => setTimeout(load, 400), { once: true });
+  }
+}

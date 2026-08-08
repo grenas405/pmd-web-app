@@ -1,0 +1,91 @@
+# /etc/systemd/system/pmd-web.service
+#
+# The Deno permission flags and the systemd sandbox say the same thing twice,
+# from two directions: Deno refuses what the process asks for, and the kernel
+# refuses what the process could reach anyway. Either alone would be enough to
+# stop most mistakes; together they make privilege escalation from a bug in
+# this application very hard.
+#
+#   sudo install -m 0644 deploy/pmd-web.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now pmd-web
+
+[Unit]
+Description=pedromdominguez.dev — Deno web application
+Documentation=https://github.com/grenas405/pmd-web-app
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=pmdweb
+Group=pmdweb
+WorkingDirectory=/srv/pmd-web
+
+Environment=APP_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=8000
+Environment=PUBLIC_ORIGIN=https://pedromdominguez.dev
+Environment=ENABLE_HSTS=true
+Environment=TRUST_PROXY=true
+Environment=STATIC_DIR=/srv/pmd-web/static
+Environment=INBOX_PATH=/var/lib/pmd-web/inbox.jsonl
+Environment=DENO_DIR=/var/lib/pmd-web/deno-cache
+
+# Exactly the capabilities the application uses, and no others. Read access is
+# two directories; write access is one file's directory; the network is one
+# loopback interface it can never leave.
+ExecStart=/usr/local/bin/deno run \
+  --allow-net=127.0.0.1 \
+  --allow-read=/srv/pmd-web/static,/var/lib/pmd-web \
+  --allow-write=/var/lib/pmd-web \
+  --allow-env=PORT,HOST,PUBLIC_ORIGIN,TRUSTED_ORIGINS,STATIC_DIR,INBOX_PATH,APP_ENV,ENABLE_HSTS,TRUST_PROXY,CONTACT_RATE_LIMIT,CONTACT_RATE_WINDOW_SECONDS \
+  --cached-only \
+  /srv/pmd-web/main.ts
+
+Restart=on-failure
+RestartSec=2s
+KillSignal=SIGTERM
+TimeoutStopSec=20s
+
+# --- sandbox -----------------------------------------------------------------
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+MemoryDenyWriteExecute=false
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0077
+
+# The only writable path in the entire filesystem for this unit.
+StateDirectory=pmd-web
+ReadWritePaths=/var/lib/pmd-web
+
+# --- limits ------------------------------------------------------------------
+LimitNOFILE=8192
+MemoryMax=512M
+TasksMax=64
+
+# journald captures the JSON access log on stdout; no log files, no rotation.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pmd-web
+
+[Install]
+WantedBy=multi-user.target
