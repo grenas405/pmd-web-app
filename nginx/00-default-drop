@@ -1,0 +1,27 @@
+# Catch-all default server. Deploy to /etc/nginx/sites-available/00-default-drop
+# and symlink into sites-enabled (remove the distro "default" site first):
+#   sudo rm -f /etc/nginx/sites-enabled/default
+#   sudo ln -sf /etc/nginx/sites-available/00-default-drop /etc/nginx/sites-enabled/00-default-drop
+#
+# Requests that match no configured server_name (bare-IP scans, fake Host
+# headers) get the connection closed with no response at all. Every real
+# site on this box has its own server_name vhost, so none of them are
+# affected.
+#
+# One file for the whole box, not one per site: install it once, and every
+# application deployed here inherits it.
+#
+# ssl_reject_handshake requires nginx >= 1.19.4. On older nginx, replace it
+# with the ssl_certificate/ssl_certificate_key lines from any Certbot vhost
+# plus `return 444;`.
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    return 444;
+}
+
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    ssl_reject_handshake on;
+}

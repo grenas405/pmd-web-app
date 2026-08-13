@@ -55,7 +55,10 @@ touches the environment.
 | `src/content/*.ts`      | Copy and portfolio entries, as plain data                                   |
 | `src/contact/*.ts`      | Contact schema (pure) and inbox append (the only disk write)                |
 | `static/`               | CSS, ES modules, images, vendored font and Anime.js                         |
-| `deploy/`               | Nginx site and the systemd unit                                             |
+| `systemd/`              | The unit and its optional environment file                                  |
+| `nginx/`                | The vhost, plus the box-wide probe snippet and catch-all server             |
+| `fail2ban/`             | The `nginx-probes` filter and jail                                          |
+| `scripts/`              | `deploy.sh`: everything above, installed in one command                     |
 
 ### The rules the code follows
 
@@ -125,44 +128,140 @@ than producing surprising behaviour later.
 
 ---
 
-## Deployment
+## Production Deployment
 
-Ubuntu LTS, Nginx, systemd. Everything is in `deploy/` and is commented.
+Ubuntu LTS, Nginx, systemd, fail2ban — the same layout as the other Deno sites on this box:
+`systemd/` for the unit and its environment file, `nginx/` for the vhost and the box-wide hardening,
+`fail2ban/` for the jail, `scripts/` for the one command that installs all of it.
 
 ```sh
-sudo deploy/deploy.sh
+sudo scripts/deploy.sh
 ```
 
-That is the steps below, in the same order, made idempotent and made to stop at the first thing that
-goes wrong. It verifies the tree before copying anything, so a failing test suite is a message
-rather than a bad deployment; it warms the module cache as the service user; and it does not call
-the deployment finished until `127.0.0.1:<PORT>/healthz` answers — the port read back out of the
-unit file, so the check cannot drift from what was installed. Nginx is reloaded last, and only
-behind a passing `nginx -t`.
+The application runs **from the checkout**, as the user who owns it. There is no second copy under
+`/srv` to drift out of step with git: `systemctl cat pmd-web` names the directory you edit, and
+updating is a pull and a redeploy.
 
-It needs `deno`, `rsync`, `nginx` and `certbot` present, the DNS records for the domain already
-pointing at the host, and 80/tcp reachable from the internet for the ACME challenge.
+```sh
+cd ~/.local/src/development/pmd-web-app
+git pull && sudo scripts/deploy.sh --skip-certbot
+```
+
+`deploy.sh` is the install flows below in the same order, made idempotent and made to stop at the
+first thing that goes wrong. It verifies the tree before installing anything, so a failing test
+suite is a message rather than a bad deployment; it warms the module cache as the service user so
+`--cached-only` holds; it rewrites the unit's paths for this host; and it does not call the
+deployment finished until `127.0.0.1:<PORT>/healthz` answers — the port read back out of the unit
+file, so the check cannot drift from what was installed.
+
+It needs `deno` at `/usr/bin/deno`, plus `nginx`, `certbot` and `fail2ban`, the DNS records already
+pointing at the host, and 80/tcp reachable for the ACME challenge.
 
 | Flag              | Effect                                                          |
 | ----------------- | --------------------------------------------------------------- |
 | `--skip-verify`   | Redeploy a tree that was already verified                       |
 | `--skip-nginx`    | Service only; the proxy lives elsewhere. Implies the next       |
 | `--skip-certbot`  | Leave certificates alone                                        |
+| `--skip-fail2ban` | Leave the jail and the probe filter alone                       |
 | `--staging`       | Issue from the staging CA: untrusted, but not rate limited      |
 | `--force-renewal` | Renew a certificate that is still valid. Rate limited by the CA |
 
-`APP_USER`, `APP_GROUP`, `APP_DIR`, `STATE_DIR`, `SERVICE_NAME`, `SITE_NAME`, `CERT_DOMAINS`,
+`APP_DIR`, `APP_USER`, `APP_GROUP`, `SERVICE_NAME`, `SITE_NAME`, `ENV_FILE`, `CERT_DOMAINS`,
 `CERTBOT_EMAIL` and `WEBROOT` can be overridden from the environment (`sudo -E`).
+
+### systemd
+
+The unit is [systemd/pmd-web.service](systemd/pmd-web.service), with an optional environment file at
+[systemd/pmd-web.env.example](systemd/pmd-web.env.example). It assumes:
+
+- the checkout is at `~/.local/src/development/pmd-web-app` and the service runs as its owner
+- Deno is installed at `/usr/bin/deno`
+- the module cache is `/var/cache/pmd-web/deno` (`CacheDirectory=`), so the unit can run
+  `--cached-only` and never contact a registry — not at start, not after a restart at 3am
+- `var/` inside the checkout is the only writable path (`ReadWritePaths=`), and holds the inbox
+- the app listens on `127.0.0.1:8002`
+
+`deploy.sh` rewrites `User=`, `Group=`, `WorkingDirectory=`, `ConditionPathExists=` and
+`ReadWritePaths=` for the host it runs on, so the committed unit keeps one set of readable
+placeholder paths instead of one commit per machine. Everything else — the Deno permission
+allowlist, the syscall filter, the empty capability bounding set — is the same in git and on the
+server. `/etc/pmd-web/pmd-web.env` overrides any of it and is installed **only when absent**: it is
+the one file meant to diverge from the repository.
+
+```sh
+sudo install -o root -g root -m 0644 systemd/pmd-web.service /etc/systemd/system/pmd-web.service
+sudo install -d -m 0755 /etc/pmd-web
+sudo install -o root -g root -m 0640 systemd/pmd-web.env.example /etc/pmd-web/pmd-web.env
+sudo systemctl daemon-reload && sudo systemctl enable --now pmd-web.service
+
+sudo systemd-analyze verify /etc/systemd/system/pmd-web.service
+journalctl -u pmd-web -f --output cat | jq .
+tail -f var/inbox.jsonl | jq .
+```
+
+### Server hardening (nginx + fail2ban)
+
+The VPS sees constant automated scanning for PHP/WordPress paths (`/xyz.php`, `/wp-admin/...`).
+Nothing on the box runs PHP, so any such request is a scanner. Three tracked configs shut that
+traffic down, and two of the three are box-wide rather than per site:
+
+- [nginx/snippets/deny-probes.conf](nginx/snippets/deny-probes.conf) — location blocks returning
+  `444` (connection closed, no response) for `.php`/WordPress/dotfile probes. Included by the vhost;
+  add the same `include snippets/deny-probes.conf;` line to any other vhost on the box.
+- [nginx/00-default-drop](nginx/00-default-drop) — catch-all `default_server` for 80/443 that closes
+  the connection on any request whose `Host` matches no configured vhost (bare-IP scans, forged Host
+  headers). Without it, nginx falls back to the first vhost alphabetically, which is how scanners
+  end up receiving a real site's redirect.
+- [fail2ban/](fail2ban/) — an `nginx-probes` jail (3 probe requests within 10 minutes → source IP
+  banned from 80/443 for 24h) plus the stock `sshd` jail. Two gotchas are in the comments of
+  [fail2ban/jail.local](fail2ban/jail.local): fail2ban must be **restarted** after the config lands,
+  and the jail needs `backend = polling` or it reads the journal, where nginx access logs never
+  appear. `deploy.sh` installs `jail.local` only when absent — the real sshd port is an edit that
+  belongs on the server and not in git.
+
+The vhost is [nginx/pedromdominguez.dev](nginx/pedromdominguez.dev): TLS, compression, per-site logs
+and connection limits only. It adds no security headers, because those are the application's and two
+copies would drift apart. Its access log is named `/var/log/nginx/pedromdominguez.access.log`, which
+is what puts this site inside the jail's `*access.log` glob.
+
+```sh
+sudo install -o root -g root -m 0644 nginx/snippets/deny-probes.conf /etc/nginx/snippets/deny-probes.conf
+sudo install -o root -g root -m 0644 nginx/00-default-drop /etc/nginx/sites-available/00-default-drop
+sudo install -o root -g root -m 0644 nginx/pedromdominguez.dev /etc/nginx/sites-available/pedromdominguez.dev
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo ln -sf /etc/nginx/sites-available/00-default-drop /etc/nginx/sites-enabled/00-default-drop
+sudo ln -sf /etc/nginx/sites-available/pedromdominguez.dev /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+
+sudo apt install -y fail2ban
+sudo install -o root -g root -m 0644 fail2ban/filter.d/nginx-probes.conf /etc/fail2ban/filter.d/nginx-probes.conf
+sudo install -o root -g root -m 0644 fail2ban/jail.local /etc/fail2ban/jail.local
+sudo systemctl restart fail2ban
+sudo fail2ban-client status nginx-probes   # must show "File list:", not "Journal matches:"
+```
+
+Verification:
+
+```sh
+curl -so /dev/null -w '%{http_code}\n' https://pedromdominguez.dev/test.php   # 000 (closed)
+curl -so /dev/null -w '%{http_code}\n' http://<server-ip>/anything            # 000
+curl -so /dev/null -w '%{http_code}\n' https://pedromdominguez.dev/           # 200
+sudo fail2ban-regex /var/log/nginx/access.log /etc/fail2ban/filter.d/nginx-probes.conf
+```
 
 ### Certificates
 
-Handled by the script, before Nginx, because `deploy/nginx.conf` names its key material by absolute
-path and would not load without it. The first run has a chicken and egg to break — the certificate
-needs an answered HTTP challenge, the configuration needs the certificate — so it puts up a
-plaintext server block that serves `/.well-known/acme-challenge/` and answers everything else with
-503, issues, then replaces it with the real configuration. A host that already holds the lineage
-skips the bootstrap entirely: its live configuration already serves the challenge from the same
-webroot, and renewal costs no downtime.
+Handled by `deploy.sh` before Nginx, because the vhost names its key material by absolute path and
+would not load without it. The first run has a chicken and egg to break — the certificate needs an
+answered HTTP challenge, the configuration needs the certificate — so it puts up a plaintext server
+block that serves `/.well-known/acme-challenge/` and answers everything else with 503, issues, then
+replaces it with the real configuration. A host that already holds the lineage skips the bootstrap
+entirely: its live configuration already serves the challenge from the same webroot, and renewal
+costs no downtime.
+
+TLS settings are written out in the vhost rather than pulled in from
+`/etc/letsencrypt/options-ssl-nginx.conf`, so reading that one file tells you the whole policy and a
+fresh host needs nothing from Certbot but the key material itself.
 
 Renewal is `certbot.timer`, which the script enables. Certbot renews the file but Nginx goes on
 serving the copy in its memory, so the script also installs
@@ -171,56 +270,15 @@ deployment's responsibility. Rehearse against the staging CA first; the real one
 five failures an hour per account.
 
 ```sh
-sudo deploy/deploy.sh --staging     # rehearse: untrusted cert, no rate limit
-sudo deploy/deploy.sh               # then the real one
+sudo scripts/deploy.sh --staging    # rehearse: untrusted cert, no rate limit
+sudo scripts/deploy.sh              # then the real one
 sudo certbot certificates           # what is on disk and when it expires
-```
 
-What the script does, should you prefer to do it by hand:
-
-```sh
-# 1. A user with no shell and no home directory to compromise.
-sudo useradd --system --no-create-home --shell /usr/sbin/nologin pmdweb
-
-# 2. The application.
-sudo mkdir -p /srv/pmd-web
-sudo rsync -a --delete --exclude var/ ./ /srv/pmd-web/
-sudo chown -R root:root /srv/pmd-web        # the app cannot modify itself
-
-# 3. Its one writable directory.
-sudo install -d -o pmdweb -g pmdweb -m 0750 /var/lib/pmd-web
-
-# 4. Warm the module cache so the service can run --cached-only, offline.
-sudo -u pmdweb DENO_DIR=/var/lib/pmd-web/deno-cache \
-  deno cache /srv/pmd-web/main.ts
-
-# 5. The service.
-sudo install -m 0644 deploy/pmd-web.service /etc/systemd/system/
-sudo systemctl daemon-reload && sudo systemctl enable --now pmd-web
-
-# 6. The certificate, over a plaintext server block that serves only the
-#    challenge — nginx.conf itself will not load until this exists.
 sudo install -d -m 0755 /var/www/certbot
 sudo certbot certonly --webroot -w /var/www/certbot \
   --cert-name pedromdominguez.dev \
   -d pedromdominguez.dev -d www.pedromdominguez.dev \
   --non-interactive --agree-tos -m you@example.com --keep-until-expiring
-
-# 7. The reverse proxy.
-sudo install -m 0644 deploy/nginx.conf \
-  /etc/nginx/sites-available/pedromdominguez.dev
-sudo ln -s /etc/nginx/sites-available/pedromdominguez.dev /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
-```
-
-`--cached-only` means the running service never reaches out to a registry: dependency resolution
-happened once, at deploy time, under review.
-
-Read the mail:
-
-```sh
-sudo -u pmdweb tail -f /var/lib/pmd-web/inbox.jsonl | jq .
-journalctl -u pmd-web -f --output cat | jq .
 ```
 
 ---

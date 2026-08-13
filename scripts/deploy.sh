@@ -1,31 +1,44 @@
 #!/usr/bin/env bash
 #
-# deploy.sh — put this working tree on the machine it is run on.
+# deploy.sh — put this checkout into service on the machine it is run on.
 #
-# The manual steps in README.md, in the same order, made idempotent and made to
-# stop at the first thing that goes wrong. Running it twice changes nothing the
-# second time; running it against a broken tree changes nothing at all, because
-# the test suite runs before anything is copied.
+# The install flows documented in README.md, in the same order, made idempotent
+# and made to stop at the first thing that goes wrong. Running it twice changes
+# nothing the second time; running it against a broken tree changes nothing at
+# all, because the test suite runs before anything is installed.
 #
-#   sudo deploy/deploy.sh
+#   sudo scripts/deploy.sh
+#
+# The application runs from this checkout, as the user who owns it — there is
+# no second copy under /srv to drift out of step with git, and updating is
+# `git pull && sudo scripts/deploy.sh --skip-certbot`. What that costs is a
+# service account with a shell and a home directory; what it buys is one
+# location on disk that is unambiguously the running code.
 #
 # Nothing here is specific to one host beyond the variables below, and each of
 # those can be overridden from the environment:
 #
-#   APP_USER=pmdweb APP_DIR=/srv/pmd-web sudo -E deploy/deploy.sh
+#   SITE_NAME=staging.example.dev sudo -E scripts/deploy.sh
 #
 set -euo pipefail
 
-APP_USER="${APP_USER:-pmdweb}"
-APP_GROUP="${APP_GROUP:-$APP_USER}"
-APP_DIR="${APP_DIR:-/srv/pmd-web}"
-STATE_DIR="${STATE_DIR:-/var/lib/pmd-web}"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# The checkout is the deployment. The user is whoever invoked sudo, because
+# that is who owns the files systemd is about to run.
+APP_DIR="${APP_DIR:-$REPO_ROOT}"
+APP_USER="${APP_USER:-${SUDO_USER:-root}}"
+APP_GROUP="${APP_GROUP:-$(id -gn "$APP_USER" 2>/dev/null || echo "$APP_USER")}"
 SERVICE_NAME="${SERVICE_NAME:-pmd-web}"
 SITE_NAME="${SITE_NAME:-pedromdominguez.dev}"
 
+# Secrets and per-host overrides, read by the unit's EnvironmentFile.
+ENV_DIR="${ENV_DIR:-/etc/$SERVICE_NAME}"
+ENV_FILE="${ENV_FILE:-$ENV_DIR/$SERVICE_NAME.env}"
+
 # Certificates. CERT_DOMAINS is a space-separated list; the first is the
-# lineage name, which is what deploy/nginx.conf names in its ssl_certificate
-# paths, so it has to stay in step with SITE_NAME.
+# lineage name, which is what the vhost names in its ssl_certificate paths, so
+# it has to stay in step with SITE_NAME.
 CERT_DOMAINS="${CERT_DOMAINS:-$SITE_NAME www.$SITE_NAME}"
 CERTBOT_EMAIL="${CERTBOT_EMAIL:-pedro.dfedro@gmail.com}"
 WEBROOT="${WEBROOT:-/var/www/certbot}"
@@ -33,12 +46,17 @@ WEBROOT="${WEBROOT:-/var/www/certbot}"
 SKIP_VERIFY=0
 SKIP_NGINX=0
 SKIP_CERTBOT=0
+SKIP_FAIL2BAN=0
 CERTBOT_STAGING=0
 FORCE_RENEWAL=0
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-UNIT_SRC="$REPO_ROOT/deploy/$SERVICE_NAME.service"
-NGINX_SRC="$REPO_ROOT/deploy/nginx.conf"
+UNIT_SRC="$REPO_ROOT/systemd/$SERVICE_NAME.service"
+ENV_SRC="$REPO_ROOT/systemd/$SERVICE_NAME.env.example"
+NGINX_SRC="$REPO_ROOT/nginx/$SITE_NAME"
+SNIPPET_SRC="$REPO_ROOT/nginx/snippets/deny-probes.conf"
+DEFAULT_DROP_SRC="$REPO_ROOT/nginx/00-default-drop"
+F2B_FILTER_SRC="$REPO_ROOT/fail2ban/filter.d/nginx-probes.conf"
+F2B_JAIL_SRC="$REPO_ROOT/fail2ban/jail.local"
 
 # --- output ------------------------------------------------------------------
 # stderr, so that stdout stays empty and the script can be piped without noise.
@@ -52,7 +70,7 @@ fail() {
 
 usage() {
   cat >&2 <<EOF
-usage: sudo deploy/deploy.sh [options]
+usage: sudo scripts/deploy.sh [options]
 
   --skip-verify   Do not run the test suite first. Only for a redeploy of a
                   tree that was already verified.
@@ -61,13 +79,14 @@ usage: sudo deploy/deploy.sh [options]
                   --skip-certbot.
   --skip-certbot  Do not touch certificates. The Nginx configuration will
                   still fail to load without them.
+  --skip-fail2ban Do not install the jail or the probe filter.
   --staging       Issue from Let's Encrypt's staging CA. Untrusted by
                   browsers, but not rate limited — use it to rehearse.
   --force-renewal Renew even though the current certificate is still valid.
                   Rate limited by the CA; do not put this in a loop.
   -h, --help      This text.
 
-Environment: APP_USER, APP_GROUP, APP_DIR, STATE_DIR, SERVICE_NAME, SITE_NAME,
+Environment: APP_DIR, APP_USER, APP_GROUP, SERVICE_NAME, SITE_NAME, ENV_FILE,
 CERT_DOMAINS, CERTBOT_EMAIL, WEBROOT.
 EOF
 }
@@ -77,6 +96,7 @@ while [ $# -gt 0 ]; do
     --skip-verify) SKIP_VERIFY=1 ;;
     --skip-nginx) SKIP_NGINX=1 ;;
     --skip-certbot) SKIP_CERTBOT=1 ;;
+    --skip-fail2ban) SKIP_FAIL2BAN=1 ;;
     --staging) CERTBOT_STAGING=1 ;;
     --force-renewal) FORCE_RENEWAL=1 ;;
     -h | --help)
@@ -93,7 +113,7 @@ done
 [ "$SKIP_NGINX" -eq 0 ] || SKIP_CERTBOT=1
 
 # The lineage is named after the first domain: that is how certbot names the
-# directory, and it is the path deploy/nginx.conf reads its key material from.
+# directory, and it is the path the vhost reads its key material from.
 CERT_NAME="${CERT_DOMAINS%% *}"
 CERT_DIR="/etc/letsencrypt/live/$CERT_NAME"
 
@@ -103,30 +123,38 @@ CERT_DIR="/etc/letsencrypt/live/$CERT_NAME"
 
 step "Preflight"
 
-[ "$(id -u)" -eq 0 ] || fail "run with sudo: installing units and writing $APP_DIR needs root"
+[ "$(id -u)" -eq 0 ] || fail "run with sudo: installing units and reloading nginx needs root"
 
-for f in "$UNIT_SRC" "$REPO_ROOT/main.ts" "$REPO_ROOT/deno.json"; do
+for f in "$UNIT_SRC" "$ENV_SRC" "$REPO_ROOT/main.ts" "$REPO_ROOT/deno.json"; do
   [ -f "$f" ] || fail "missing $f — run this from a checkout of the repository"
 done
-[ "$SKIP_NGINX" -eq 1 ] || [ -f "$NGINX_SRC" ] || fail "missing $NGINX_SRC"
+if [ "$SKIP_NGINX" -eq 0 ]; then
+  for f in "$NGINX_SRC" "$SNIPPET_SRC" "$DEFAULT_DROP_SRC"; do
+    [ -f "$f" ] || fail "missing $f (SITE_NAME=$SITE_NAME names nginx/$SITE_NAME)"
+  done
+fi
 
-for cmd in rsync systemctl install; do
+for cmd in systemctl install sed; do
   command -v "$cmd" >/dev/null 2>&1 || fail "$cmd is not installed"
 done
 
-# Deno is usually installed for a login user and absent from root's PATH; the
-# unit names an absolute path, and so does this script.
-DENO="${DENO:-$(command -v deno || true)}"
-[ -n "$DENO" ] && [ -x "$DENO" ] || DENO=/usr/local/bin/deno
-[ -x "$DENO" ] || fail "deno not found (set DENO=/path/to/deno)"
+id -u "$APP_USER" >/dev/null 2>&1 || fail "no such user: $APP_USER"
+[ "$APP_USER" != root ] ||
+  fail "refusing to run the service as root — invoke through sudo from a login user, or set APP_USER"
+
+# The unit names an absolute interpreter path, the same one portfolio-app uses
+# on this box. A ~/.deno/bin install is invisible to systemd and to root.
+DENO="${DENO:-/usr/bin/deno}"
+[ -x "$DENO" ] ||
+  fail "no deno at $DENO — install it there (sudo install -m 0755 ~/.deno/bin/deno /usr/bin/deno)"
 info "deno:    $DENO ($("$DENO" --version | head -n 1))"
 
 # The unit file is the single source of truth for the port. Reading it back
 # here means the health check below cannot drift away from what was installed.
 APP_PORT="$(sed -n 's/^Environment=PORT=\([0-9]\+\).*/\1/p' "$UNIT_SRC" | tail -n 1)"
 [ -n "$APP_PORT" ] || fail "no Environment=PORT= line in $UNIT_SRC"
-info "source:  $REPO_ROOT"
-info "target:  $APP_DIR (user $APP_USER, port $APP_PORT)"
+info "source:  $APP_DIR"
+info "runs as: $APP_USER:$APP_GROUP on 127.0.0.1:$APP_PORT"
 
 if [ "$SKIP_NGINX" -eq 0 ] && ! command -v nginx >/dev/null 2>&1; then
   fail "nginx is not installed (pass --skip-nginx if it lives elsewhere)"
@@ -136,14 +164,14 @@ if [ "$SKIP_CERTBOT" -eq 0 ]; then
   command -v certbot >/dev/null 2>&1 ||
     fail "certbot is not installed: sudo apt-get install -y certbot (or --skip-certbot)"
 
-  # deploy/nginx.conf names its key material by absolute path. If that path and
-  # the lineage this script is about to issue disagree, Nginx would load a
-  # certificate nobody renews — so refuse now rather than discover it in ninety
-  # days when the old one expires.
+  # The vhost names its key material by absolute path. If that path and the
+  # lineage this script is about to issue disagree, Nginx would load a
+  # certificate nobody renews — so refuse now rather than discover it in
+  # ninety days when the old one expires.
   conf_dir="$(sed -n 's|^[[:space:]]*ssl_certificate[[:space:]]\+\(/etc/letsencrypt/live/[^/]\+\)/.*|\1|p' \
     "$NGINX_SRC" | head -n 1)"
   if [ -n "$conf_dir" ] && [ "$conf_dir" != "$CERT_DIR" ]; then
-    fail "nginx.conf reads $conf_dir but this deploy issues $CERT_DIR — set CERT_DOMAINS or SITE_NAME"
+    fail "$SITE_NAME reads $conf_dir but this deploy issues $CERT_DIR — set CERT_DOMAINS or SITE_NAME"
   fi
 
   case "$CERTBOT_EMAIL" in
@@ -153,87 +181,83 @@ if [ "$SKIP_CERTBOT" -eq 0 ]; then
   info "certs:   $CERT_DOMAINS -> $CERT_DIR"
 fi
 
+if [ "$SKIP_FAIL2BAN" -eq 0 ] && ! command -v fail2ban-client >/dev/null 2>&1; then
+  fail "fail2ban is not installed: sudo apt-get install -y fail2ban (or --skip-fail2ban)"
+fi
+
 # --- verify ------------------------------------------------------------------
 # Formatting, lint, type check and the full suite, against the tree about to be
-# copied. As the invoking user: root has no reason to own a module cache.
+# put into service. As the owning user: root has no reason to own a cache.
 
 step "Verify"
 
 if [ "$SKIP_VERIFY" -eq 1 ]; then
   info "skipped (--skip-verify)"
 else
-  if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
-    # -H, not --preserve-env=HOME: sudo has already set HOME to /root, and a
-    # deno running as the login user with that HOME cannot write its cache.
-    sudo -u "$SUDO_USER" -H -- \
-      sh -c "cd '$REPO_ROOT' && '$DENO' task verify" >&2 ||
-      fail "the test suite did not pass — nothing was deployed"
-  else
-    (cd "$REPO_ROOT" && "$DENO" task verify) >&2 ||
-      fail "the test suite did not pass — nothing was deployed"
-  fi
+  # -H, not --preserve-env=HOME: sudo has already set HOME to /root, and a
+  # deno running as the login user with that HOME cannot write its cache.
+  sudo -u "$APP_USER" -H -- \
+    sh -c "cd '$APP_DIR' && '$DENO' task verify" >&2 ||
+    fail "the test suite did not pass — nothing was deployed"
   info "all checks passed"
 fi
 
-# --- account -----------------------------------------------------------------
-# A system user with no shell and no home directory: there is nothing to log
-# into and nothing to leave behind.
+# --- environment file ------------------------------------------------------------
+# Installed only when absent. It is the one file on the server that is meant to
+# diverge from git — overwriting it on every deploy would discard the host's
+# own settings, which is the opposite of what an override file is for.
 
-step "Account"
+step "Environment"
 
-if id -u "$APP_USER" >/dev/null 2>&1; then
-  info "user $APP_USER already exists"
+install -d -m 0755 "$ENV_DIR"
+if [ -e "$ENV_FILE" ]; then
+  info "$ENV_FILE exists, left alone"
 else
-  useradd --system --no-create-home --shell /usr/sbin/nologin "$APP_USER"
-  info "created system user $APP_USER"
+  install -o root -g "$APP_GROUP" -m 0640 "$ENV_SRC" "$ENV_FILE"
+  info "installed $ENV_FILE from the example — review it"
 fi
 
-# --- application ---------------------------------------------------------------
-# Owned by root, so the service account cannot rewrite the code it runs. `var/`
-# is a development inbox and never belongs on a server; `.git` is history the
-# web tier has no use for.
-
-step "Application"
-
-install -d -m 0755 "$APP_DIR"
-rsync -a --delete \
-  --exclude '.git/' \
-  --exclude '.github/' \
-  --exclude 'var/' \
-  --exclude 'tests/' \
-  --exclude '*.swp' \
-  "$REPO_ROOT/" "$APP_DIR/"
-chown -R root:root "$APP_DIR"
-info "synced $(du -sh "$APP_DIR" | cut -f1) to $APP_DIR"
-
-install -d -o "$APP_USER" -g "$APP_GROUP" -m 0750 "$STATE_DIR"
-info "state directory $STATE_DIR"
-
-# --- module cache --------------------------------------------------------------
+# --- module cache ----------------------------------------------------------------
 # Resolved once here, under review, so the unit can run --cached-only and the
 # service never contacts a registry — not at start, not after a restart at 3am.
+# CacheDirectory= in the unit owns this path once systemd takes over.
 
 step "Module cache"
 
-install -d -o "$APP_USER" -g "$APP_GROUP" -m 0750 "$STATE_DIR/deno-cache"
-sudo -u "$APP_USER" DENO_DIR="$STATE_DIR/deno-cache" \
-  "$DENO" cache "$APP_DIR/main.ts" >&2 ||
-  fail "could not populate the module cache at $STATE_DIR/deno-cache"
-info "cached into $STATE_DIR/deno-cache"
+DENO_CACHE="/var/cache/$SERVICE_NAME/deno"
+install -d -o "$APP_USER" -g "$APP_GROUP" -m 0750 "/var/cache/$SERVICE_NAME" "$DENO_CACHE"
+sudo -u "$APP_USER" DENO_DIR="$DENO_CACHE" "$DENO" cache "$APP_DIR/main.ts" >&2 ||
+  fail "could not populate the module cache at $DENO_CACHE"
 
-# --- service -------------------------------------------------------------------
+# The inbox directory, the only path in the checkout the service may write.
+install -d -o "$APP_USER" -g "$APP_GROUP" -m 0750 "$APP_DIR/var"
+info "cached into $DENO_CACHE"
+
+# --- service -----------------------------------------------------------------------
+# The unit in git carries placeholder paths for the machine it was written on.
+# They are rewritten here rather than committed per host, so `git diff` on the
+# server stays empty and the unit stays readable.
 
 step "Service"
 
-install -m 0644 "$UNIT_SRC" "/etc/systemd/system/$SERVICE_NAME.service"
+unit_tmp="$(mktemp)"
+trap 'rm -f "$unit_tmp"' EXIT
+sed -e "s|^\(ConditionPathExists=\).*|\1$APP_DIR/main.ts|" \
+  -e "s|^\(WorkingDirectory=\).*|\1$APP_DIR|" \
+  -e "s|^\(ReadWritePaths=\).*|\1$APP_DIR/var|" \
+  -e "s|^\(User=\).*|\1$APP_USER|" \
+  -e "s|^\(Group=\).*|\1$APP_GROUP|" \
+  "$UNIT_SRC" >"$unit_tmp"
+
+install -o root -g root -m 0644 "$unit_tmp" "/etc/systemd/system/$SERVICE_NAME.service"
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME" >/dev/null 2>&1 || true
 
 # restart, not reload: the unit is Type=exec and has no reload semantics.
 systemctl restart "$SERVICE_NAME"
-info "$SERVICE_NAME restarted"
+info "$SERVICE_NAME restarted (WorkingDirectory=$APP_DIR)"
 
-# --- health --------------------------------------------------------------------
+# --- health ------------------------------------------------------------------------
 # The deployment is not finished when systemd returns; it is finished when the
 # application answers. Fifteen tries at a fifth of a second is generous for a
 # process whose entire startup is reading a directory.
@@ -266,8 +290,8 @@ if [ "$healthy" -eq 0 ]; then
 fi
 info "127.0.0.1:$APP_PORT/healthz -> $body"
 
-# --- certificates ----------------------------------------------------------------
-# Before the reverse proxy, because deploy/nginx.conf names its key material by
+# --- certificates ------------------------------------------------------------------
+# Before the reverse proxy, because the vhost names its key material by
 # absolute path: `nginx -t` fails outright if the lineage is not on disk yet.
 #
 # The bootstrap is the chicken and egg of ACME. The certificate cannot be
@@ -312,12 +336,11 @@ else
   if [ ! -s "$CERT_DIR/fullchain.pem" ]; then
     info "no lineage at $CERT_DIR — bootstrapping over plaintext"
 
-    # Only the challenge, and a redirect for everything else. This is the same
-    # port 80 block the real configuration ends with, minus everything that
-    # depends on a certificate.
+    # Only the challenge, and 503 for everything else. This is the port 80
+    # block of the real vhost, minus everything that depends on a certificate.
     cat >"/etc/nginx/sites-available/$SITE_NAME" <<EOF
-# Temporary: written by deploy/deploy.sh for the first ACME challenge only.
-# Replaced by deploy/nginx.conf as soon as the certificate exists.
+# Temporary: written by scripts/deploy.sh for the first ACME challenge only.
+# Replaced by nginx/$SITE_NAME as soon as the certificate exists.
 server {
     listen 80;
     listen [::]:80;
@@ -352,8 +375,8 @@ EOF
   install -d -m 0755 /etc/letsencrypt/renewal-hooks/deploy
   cat >/etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh <<'EOF'
 #!/bin/sh
-# Written by deploy/deploy.sh. Certbot renews the file; Nginx has to be told to
-# read it again, or it serves the expired one it already has in memory.
+# Written by scripts/deploy.sh. Certbot renews the file; Nginx has to be told
+# to read it again, or it serves the expired one it already has in memory.
 set -eu
 nginx -t && systemctl reload nginx
 EOF
@@ -367,21 +390,63 @@ EOF
   fi
 fi
 
-# --- reverse proxy ---------------------------------------------------------------
-# Last, and only once the application behind it is known to answer and the key
-# material it points at is on disk.
+# --- reverse proxy -------------------------------------------------------------------
+# The vhost, plus the two box-wide pieces it depends on: the probe snippet it
+# includes, and the catch-all that closes the connection on requests addressed
+# to no server_name at all. Both are shared with every other site on the host,
+# and installing them is idempotent.
 
 step "Reverse proxy"
 
 if [ "$SKIP_NGINX" -eq 1 ]; then
   info "skipped (--skip-nginx)"
 else
-  install -m 0644 "$NGINX_SRC" "/etc/nginx/sites-available/$SITE_NAME"
+  install -d -m 0755 /etc/nginx/snippets
+  install -o root -g root -m 0644 "$SNIPPET_SRC" /etc/nginx/snippets/deny-probes.conf
+  install -o root -g root -m 0644 "$DEFAULT_DROP_SRC" /etc/nginx/sites-available/00-default-drop
+
+  # The distro default site answers for any unmatched Host, which is exactly
+  # what 00-default-drop is here to stop doing.
+  rm -f /etc/nginx/sites-enabled/default
+  ln -sfn /etc/nginx/sites-available/00-default-drop /etc/nginx/sites-enabled/00-default-drop
+
+  install -o root -g root -m 0644 "$NGINX_SRC" "/etc/nginx/sites-available/$SITE_NAME"
   ln -sfn "/etc/nginx/sites-available/$SITE_NAME" "/etc/nginx/sites-enabled/$SITE_NAME"
+
   nginx_apply
-  info "nginx serving $SITE_NAME"
+  info "nginx serving $SITE_NAME, probes dropped, default site removed"
+fi
+
+# --- fail2ban ---------------------------------------------------------------------------
+# The filter is this repository's and is kept current. jail.local is the box's,
+# shared with every other site, and carries edits that are deliberately not in
+# git (the real sshd port) — so it is installed only when absent.
+
+step "fail2ban"
+
+if [ "$SKIP_FAIL2BAN" -eq 1 ]; then
+  info "skipped (--skip-fail2ban)"
+else
+  install -o root -g root -m 0644 "$F2B_FILTER_SRC" /etc/fail2ban/filter.d/nginx-probes.conf
+
+  if [ -e /etc/fail2ban/jail.local ]; then
+    info "/etc/fail2ban/jail.local exists, left alone"
+  else
+    install -o root -g root -m 0644 "$F2B_JAIL_SRC" /etc/fail2ban/jail.local
+    info "installed /etc/fail2ban/jail.local — set the real sshd port in it"
+  fi
+
+  # Restart, not reload: apt starts fail2ban before jail.local exists, and a
+  # running daemon does not pick the file up any other way.
+  systemctl restart fail2ban
+  if fail2ban-client status nginx-probes 2>/dev/null | grep -q "File list:"; then
+    info "jail nginx-probes is reading the access logs"
+  else
+    info "warning: nginx-probes is not tailing files — check 'backend = polling' in jail.local"
+  fi
 fi
 
 step "Deployed"
 info "journalctl -u $SERVICE_NAME -f --output cat | jq ."
-info "sudo -u $APP_USER tail -f $STATE_DIR/inbox.jsonl | jq ."
+info "sudo -u $APP_USER tail -f $APP_DIR/var/inbox.jsonl | jq ."
+info "sudo fail2ban-client status nginx-probes"

@@ -1,26 +1,34 @@
 # /etc/systemd/system/pmd-web.service
 #
+# The application runs from the checkout, as the login user who deployed it —
+# the same arrangement as portfolio-app on this box. There is no copy under
+# /srv to drift out of step with git: `git pull` and a restart is the whole
+# update, and `systemctl cat pmd-web` names the directory you edit.
+#
 # The Deno permission flags and the systemd sandbox say the same thing twice,
 # from two directions: Deno refuses what the process asks for, and the kernel
-# refuses what the process could reach anyway. Either alone would be enough to
-# stop most mistakes; together they make privilege escalation from a bug in
-# this application very hard.
+# refuses what the process could reach anyway.
 #
-#   sudo install -m 0644 deploy/pmd-web.service /etc/systemd/system/
+#   sudo install -o root -g root -m 0644 systemd/pmd-web.service /etc/systemd/system/
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now pmd-web
+#
+# WorkingDirectory, ConditionPathExists, ReadWritePaths and User all name the
+# checkout. scripts/deploy.sh rewrites them for the host it runs on; edit them
+# by hand only if you install this file yourself.
 
 [Unit]
 Description=pedromdominguez.dev — Deno web application
 Documentation=https://github.com/grenas405/pmd-web-app
+ConditionPathExists=/home/sysadmin/.local/src/development/pmd-web-app/main.ts
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=exec
-User=pmdweb
-Group=pmdweb
-WorkingDirectory=/srv/pmd-web
+User=sysadmin
+Group=sysadmin
+WorkingDirectory=/home/sysadmin/.local/src/development/pmd-web-app
 
 Environment=APP_ENV=production
 Environment=HOST=127.0.0.1
@@ -28,20 +36,22 @@ Environment=PORT=8002
 Environment=PUBLIC_ORIGIN=https://pedromdominguez.dev
 Environment=ENABLE_HSTS=true
 Environment=TRUST_PROXY=true
-Environment=STATIC_DIR=/srv/pmd-web/static
-Environment=INBOX_PATH=/var/lib/pmd-web/inbox.jsonl
-Environment=DENO_DIR=/var/lib/pmd-web/deno-cache
+Environment=DENO_DIR=/var/cache/pmd-web/deno
+
+# Secrets and per-host overrides, none of them in git. The leading `-` makes
+# the file optional: the defaults above stand on their own.
+EnvironmentFile=-/etc/pmd-web/pmd-web.env
 
 # Exactly the capabilities the application uses, and no others. Read access is
-# two directories; write access is one file's directory; the network is one
-# loopback interface it can never leave.
-ExecStart=/usr/local/bin/deno run \
+# the checkout; write access is its var/ directory; the network is one loopback
+# interface it can never leave.
+ExecStart=/usr/bin/deno run \
   --allow-net=127.0.0.1 \
-  --allow-read=/srv/pmd-web/static,/var/lib/pmd-web \
-  --allow-write=/var/lib/pmd-web \
+  --allow-read=static,var \
+  --allow-write=var \
   --allow-env=PORT,HOST,PUBLIC_ORIGIN,TRUSTED_ORIGINS,STATIC_DIR,INBOX_PATH,APP_ENV,ENABLE_HSTS,TRUST_PROXY,CONTACT_RATE_LIMIT,CONTACT_RATE_WINDOW_SECONDS \
   --cached-only \
-  /srv/pmd-web/main.ts
+  main.ts
 
 Restart=on-failure
 RestartSec=2s
@@ -49,11 +59,13 @@ KillSignal=SIGTERM
 TimeoutStopSec=20s
 
 # --- sandbox -----------------------------------------------------------------
+# ProtectHome=false because the checkout lives under /home; everything else is
+# as closed as it was when the code ran out of /srv.
 NoNewPrivileges=true
 PrivateTmp=true
 PrivateDevices=true
-ProtectSystem=strict
-ProtectHome=true
+ProtectSystem=full
+ProtectHome=false
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectKernelLogs=true
@@ -65,17 +77,20 @@ RestrictNamespaces=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
 LockPersonality=true
 MemoryDenyWriteExecute=false
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
 CapabilityBoundingSet=
 AmbientCapabilities=
-UMask=0077
+UMask=0027
 
-# The only writable path in the entire filesystem for this unit.
-StateDirectory=pmd-web
-ReadWritePaths=/var/lib/pmd-web
+# The module cache, resolved once at deploy time so --cached-only can hold.
+CacheDirectory=pmd-web
+
+# The inbox, and the only writable path in the checkout.
+ReadWritePaths=/home/sysadmin/.local/src/development/pmd-web-app/var
 
 # --- limits ------------------------------------------------------------------
 LimitNOFILE=8192

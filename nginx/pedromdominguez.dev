@@ -6,8 +6,20 @@
 # the rest are the application's, and are not duplicated here where the two
 # copies would inevitably drift apart.
 #
-#   sudo ln -s /etc/nginx/sites-available/pedromdominguez.dev /etc/nginx/sites-enabled/
+#   sudo install -o root -g root -m 0644 nginx/pedromdominguez.dev \
+#     /etc/nginx/sites-available/pedromdominguez.dev
+#   sudo ln -sf /etc/nginx/sites-available/pedromdominguez.dev /etc/nginx/sites-enabled/
 #   sudo nginx -t && sudo systemctl reload nginx
+#
+# The box-wide pieces this depends on live beside it in the repo and are
+# installed once, not per site: nginx/snippets/deny-probes.conf (included
+# below) and nginx/00-default-drop (the catch-all that closes the connection
+# on anything addressed to no server_name at all).
+#
+# TLS is not Certbot-managed here. The settings below are explicit rather than
+# an `include /etc/letsencrypt/options-ssl-nginx.conf`, so that reading this
+# file tells you the whole policy, and so a fresh host needs nothing from
+# Certbot but the key material itself.
 
 # Connection-level abuse limits, applied before anything reaches Deno.
 limit_req_zone $binary_remote_addr zone=pmd_general:10m rate=20r/s;
@@ -65,6 +77,10 @@ server {
     # Do not advertise the version to anyone scanning for known Nginx bugs.
     server_tokens off;
 
+    # Scanner traffic for stacks that do not run here, closed with no
+    # response — but still logged, because fail2ban reads the access log.
+    include snippets/deny-probes.conf;
+
     # The application refuses bodies over 16 KB itself; this stops an oversized
     # one from being buffered to disk before it ever gets there.
     client_max_body_size 32k;
@@ -83,8 +99,10 @@ server {
                application/json application/manifest+json image/svg+xml
                application/xml;
 
-    access_log /var/log/nginx/pmd-access.log;
-    error_log  /var/log/nginx/pmd-error.log warn;
+    # Per-site logs. The fail2ban jail matches /var/log/nginx/*access.log, so
+    # the name of this file is what puts this site inside the jail.
+    access_log /var/log/nginx/pedromdominguez.access.log;
+    error_log  /var/log/nginx/pedromdominguez.error.log warn;
 
     location = /api/contact {
         limit_req zone=pmd_contact burst=5 nodelay;

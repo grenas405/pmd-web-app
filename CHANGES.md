@@ -2,20 +2,41 @@
 
 ## Unreleased
 
-- `deploy/deploy.sh` — the README's deployment steps as one idempotent script: preflight checks
-  before the first change, `deno task verify` against the tree about to be copied, an rsync that
-  excludes `.git/`, `tests/` and the development `var/`, a module cache warmed as the service user
-  for `--cached-only`, then unit install, restart, and a `/healthz` probe on the port read back out
-  of the unit file. Nginx is reloaded last and only behind a passing `nginx -t`. `--skip-verify`,
-  `--skip-nginx`, and nine environment overrides for a differently laid-out host.
+- Deployment now follows the layout the other Deno sites on this box use: `systemd/`, `nginx/`,
+  `fail2ban/` and `scripts/` at the top level, in place of a single `deploy/` directory. The vhost
+  is named after the site it serves (`nginx/pedromdominguez.dev`) rather than `nginx.conf`.
+- The application runs **from the checkout**, as the user who owns it, instead of being copied to
+  `/srv/pmd-web` under a dedicated system account. There is no second copy to drift out of step with
+  git; `systemctl cat pmd-web` names the directory you edit, and an update is `git pull` and a
+  redeploy. The unit's `User=`, `Group=`, `WorkingDirectory=`, `ConditionPathExists=` and
+  `ReadWritePaths=` are rewritten by `deploy.sh` for the host it runs on, so the committed file
+  keeps one readable set of placeholder paths. The trade is a service account that has a shell and a
+  home directory; the Deno allowlist, syscall filter and empty capability bounding set are
+  unchanged, and `ProtectSystem=full` with `ProtectHome=false` replaces `strict`, which cannot see a
+  checkout under `/home`.
+- `/etc/pmd-web/pmd-web.env` (`EnvironmentFile=-`), with `systemd/pmd-web.env.example` in the repo.
+  Installed only when absent: it is the one file meant to diverge from git. The module cache moved
+  to `/var/cache/pmd-web/deno` under `CacheDirectory=`, and the interpreter to `/usr/bin/deno`.
+- Box-wide hardening, tracked and installed by the same script: `nginx/snippets/deny-probes.conf`
+  (444 on PHP/WordPress/dotfile probes, included by the vhost), `nginx/00-default-drop` (catch-all
+  `default_server` closing the connection on any unmatched `Host`, and the distro default site
+  removed), and `fail2ban/` — an `nginx-probes` jail, 3 strikes in 10 minutes, banned 24h. The jail
+  needs `backend = polling` and a restart rather than a reload, both noted in the file. `jail.local`
+  is installed only when absent, since the real sshd port belongs on the server and not in git.
+- `scripts/deploy.sh` — the README's install flows as one idempotent script: preflight checks before
+  the first change, `deno task verify` against the tree about to be put into service, the
+  environment file, a module cache warmed as the service user for `--cached-only`, then unit
+  install, restart, and a `/healthz` probe on the port read back out of the unit file. Nginx and
+  fail2ban come last, the first only behind a passing `nginx -t`. Six flags and nine environment
+  overrides for a differently laid-out host.
 - Certificates are part of that script rather than a separate errand. It issues with
-  `certbot certonly --webroot` before Nginx, since `deploy/nginx.conf` names its key material by
-  absolute path and will not load without it; a first run breaks the ACME chicken-and-egg with a
-  temporary plaintext server block serving only `/.well-known/acme-challenge/`, and a host that
-  already holds the lineage renews with no downtime at all. Preflight refuses a lineage name that
-  disagrees with the path in `nginx.conf`, which would otherwise install a certificate nobody
-  renews. `certbot.timer` is enabled and a deploy hook reloads Nginx after renewal — otherwise Nginx
-  serves the expired copy already in its memory. `--staging` rehearses against the staging CA,
+  `certbot certonly --webroot` before Nginx, since the vhost names its key material by absolute path
+  and will not load without it; a first run breaks the ACME chicken-and-egg with a temporary
+  plaintext server block serving only `/.well-known/acme-challenge/`, and a host that already holds
+  the lineage renews with no downtime at all. Preflight refuses a lineage name that disagrees with
+  the path in `nginx.conf`, which would otherwise install a certificate nobody renews.
+  `certbot.timer` is enabled and a deploy hook reloads Nginx after renewal — otherwise Nginx serves
+  the expired copy already in its memory. `--staging` rehearses against the staging CA,
   `--force-renewal` and `--skip-certbot` cover the rest.
 - Default TCP port moved from `8000` to `8002`, in `src/config.ts` (`PORT` and `PUBLIC_ORIGIN`
   defaults), the systemd unit, the Nginx upstream and the README. Nothing hard-codes a port outside
