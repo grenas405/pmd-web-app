@@ -163,7 +163,9 @@ if [ "$SKIP_VERIFY" -eq 1 ]; then
   info "skipped (--skip-verify)"
 else
   if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
-    sudo -u "$SUDO_USER" --preserve-env=HOME -- \
+    # -H, not --preserve-env=HOME: sudo has already set HOME to /root, and a
+    # deno running as the login user with that HOME cannot write its cache.
+    sudo -u "$SUDO_USER" -H -- \
       sh -c "cd '$REPO_ROOT' && '$DENO' task verify" >&2 ||
       fail "the test suite did not pass — nothing was deployed"
   else
