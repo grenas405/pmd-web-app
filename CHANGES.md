@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- `deploy/deploy.sh` — the README's deployment steps as one idempotent script: preflight checks
+  before the first change, `deno task verify` against the tree about to be copied, an rsync that
+  excludes `.git/`, `tests/` and the development `var/`, a module cache warmed as the service user
+  for `--cached-only`, then unit install, restart, and a `/healthz` probe on the port read back out
+  of the unit file. Nginx is reloaded last and only behind a passing `nginx -t`. `--skip-verify`,
+  `--skip-nginx`, and six environment overrides for a differently laid-out host.
 - Default TCP port moved from `8000` to `8002`, in `src/config.ts` (`PORT` and `PUBLIC_ORIGIN`
   defaults), the systemd unit, the Nginx upstream and the README. Nothing hard-codes a port outside
   configuration, so a deployment that sets `PORT` explicitly is unaffected.

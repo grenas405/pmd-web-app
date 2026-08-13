@@ -127,7 +127,26 @@ than producing surprising behaviour later.
 
 ## Deployment
 
-Ubuntu LTS, Nginx, systemd. Both files are in `deploy/` and are commented.
+Ubuntu LTS, Nginx, systemd. Everything is in `deploy/` and is commented.
+
+```sh
+sudo deploy/deploy.sh
+```
+
+That is the steps below, in the same order, made idempotent and made to stop at the first thing that
+goes wrong. It verifies the tree before copying anything, so a failing test suite is a message
+rather than a bad deployment; it warms the module cache as the service user; and it does not call
+the deployment finished until `127.0.0.1:<PORT>/healthz` answers — the port read back out of the
+unit file, so the check cannot drift from what was installed. Nginx is reloaded last, and only
+behind a passing `nginx -t`.
+
+| Flag            | Effect                                                |
+| --------------- | ----------------------------------------------------- |
+| `--skip-verify` | Redeploy a tree that was already verified             |
+| `--skip-nginx`  | Service only; the reverse proxy lives on another host |
+
+`APP_USER`, `APP_GROUP`, `APP_DIR`, `STATE_DIR`, `SERVICE_NAME` and `SITE_NAME` can be overridden
+from the environment (`sudo -E`). What it does, should you prefer to do it by hand:
 
 ```sh
 # 1. A user with no shell and no home directory to compromise.
