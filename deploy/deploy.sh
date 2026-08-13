@@ -23,8 +23,18 @@ STATE_DIR="${STATE_DIR:-/var/lib/pmd-web}"
 SERVICE_NAME="${SERVICE_NAME:-pmd-web}"
 SITE_NAME="${SITE_NAME:-pedromdominguez.dev}"
 
+# Certificates. CERT_DOMAINS is a space-separated list; the first is the
+# lineage name, which is what deploy/nginx.conf names in its ssl_certificate
+# paths, so it has to stay in step with SITE_NAME.
+CERT_DOMAINS="${CERT_DOMAINS:-$SITE_NAME www.$SITE_NAME}"
+CERTBOT_EMAIL="${CERTBOT_EMAIL:-pedro.dfedro@gmail.com}"
+WEBROOT="${WEBROOT:-/var/www/certbot}"
+
 SKIP_VERIFY=0
 SKIP_NGINX=0
+SKIP_CERTBOT=0
+CERTBOT_STAGING=0
+FORCE_RENEWAL=0
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 UNIT_SRC="$REPO_ROOT/deploy/$SERVICE_NAME.service"
@@ -47,10 +57,18 @@ usage: sudo deploy/deploy.sh [options]
   --skip-verify   Do not run the test suite first. Only for a redeploy of a
                   tree that was already verified.
   --skip-nginx    Install and restart the service, leave the reverse proxy
-                  alone. Use when Nginx lives on another host.
+                  alone. Use when Nginx lives on another host. Implies
+                  --skip-certbot.
+  --skip-certbot  Do not touch certificates. The Nginx configuration will
+                  still fail to load without them.
+  --staging       Issue from Let's Encrypt's staging CA. Untrusted by
+                  browsers, but not rate limited — use it to rehearse.
+  --force-renewal Renew even though the current certificate is still valid.
+                  Rate limited by the CA; do not put this in a loop.
   -h, --help      This text.
 
-Environment: APP_USER, APP_GROUP, APP_DIR, STATE_DIR, SERVICE_NAME, SITE_NAME.
+Environment: APP_USER, APP_GROUP, APP_DIR, STATE_DIR, SERVICE_NAME, SITE_NAME,
+CERT_DOMAINS, CERTBOT_EMAIL, WEBROOT.
 EOF
 }
 
@@ -58,6 +76,9 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --skip-verify) SKIP_VERIFY=1 ;;
     --skip-nginx) SKIP_NGINX=1 ;;
+    --skip-certbot) SKIP_CERTBOT=1 ;;
+    --staging) CERTBOT_STAGING=1 ;;
+    --force-renewal) FORCE_RENEWAL=1 ;;
     -h | --help)
       usage
       exit 0
@@ -66,6 +87,15 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+
+# Certificates exist to be presented by the proxy. If the proxy is somebody
+# else's problem on this host, so are they.
+[ "$SKIP_NGINX" -eq 0 ] || SKIP_CERTBOT=1
+
+# The lineage is named after the first domain: that is how certbot names the
+# directory, and it is the path deploy/nginx.conf reads its key material from.
+CERT_NAME="${CERT_DOMAINS%% *}"
+CERT_DIR="/etc/letsencrypt/live/$CERT_NAME"
 
 # --- preflight ---------------------------------------------------------------
 # Everything that could stop the deployment is checked before the first change,
@@ -100,6 +130,27 @@ info "target:  $APP_DIR (user $APP_USER, port $APP_PORT)"
 
 if [ "$SKIP_NGINX" -eq 0 ] && ! command -v nginx >/dev/null 2>&1; then
   fail "nginx is not installed (pass --skip-nginx if it lives elsewhere)"
+fi
+
+if [ "$SKIP_CERTBOT" -eq 0 ]; then
+  command -v certbot >/dev/null 2>&1 ||
+    fail "certbot is not installed: sudo apt-get install -y certbot (or --skip-certbot)"
+
+  # deploy/nginx.conf names its key material by absolute path. If that path and
+  # the lineage this script is about to issue disagree, Nginx would load a
+  # certificate nobody renews — so refuse now rather than discover it in ninety
+  # days when the old one expires.
+  conf_dir="$(sed -n 's|^[[:space:]]*ssl_certificate[[:space:]]\+\(/etc/letsencrypt/live/[^/]\+\)/.*|\1|p' \
+    "$NGINX_SRC" | head -n 1)"
+  if [ -n "$conf_dir" ] && [ "$conf_dir" != "$CERT_DIR" ]; then
+    fail "nginx.conf reads $conf_dir but this deploy issues $CERT_DIR — set CERT_DOMAINS or SITE_NAME"
+  fi
+
+  case "$CERTBOT_EMAIL" in
+    *@*.*) ;;
+    *) fail "CERTBOT_EMAIL is not an address: '$CERTBOT_EMAIL' (expiry notices go there)" ;;
+  esac
+  info "certs:   $CERT_DOMAINS -> $CERT_DIR"
 fi
 
 # --- verify ------------------------------------------------------------------
@@ -213,9 +264,110 @@ if [ "$healthy" -eq 0 ]; then
 fi
 info "127.0.0.1:$APP_PORT/healthz -> $body"
 
+# --- certificates ----------------------------------------------------------------
+# Before the reverse proxy, because deploy/nginx.conf names its key material by
+# absolute path: `nginx -t` fails outright if the lineage is not on disk yet.
+#
+# The bootstrap is the chicken and egg of ACME. The certificate cannot be
+# issued until the CA can reach http://$SITE_NAME/.well-known/acme-challenge/,
+# and the real configuration cannot load until the certificate exists. So for a
+# first issuance only, a plaintext server block that serves the challenge and
+# nothing else goes up, and the real one replaces it a step later. A host that
+# already has the lineage skips all of this: its live configuration already
+# serves the challenge from the same webroot, and renewal needs no downtime.
+
+# `nginx -t` first, always: a configuration that does not parse must never
+# reach a running Nginx, and on a fresh host there is nothing to reload yet.
+nginx_apply() {
+  nginx -t >&2 || fail "nginx rejected the configuration; the running one was left alone"
+  if systemctl is-active --quiet nginx; then
+    systemctl reload nginx
+  else
+    systemctl enable --now nginx >/dev/null 2>&1 || systemctl start nginx
+  fi
+}
+
+step "Certificates"
+
+if [ "$SKIP_CERTBOT" -eq 1 ]; then
+  info "skipped ($([ "$SKIP_NGINX" -eq 1 ] && echo --skip-nginx || echo --skip-certbot))"
+else
+  # The webroot is world-readable and holds nothing but challenge tokens, which
+  # are public by design and deleted as soon as they are answered.
+  install -d -m 0755 "$WEBROOT"
+
+  certbot_args=(certonly --webroot -w "$WEBROOT" --cert-name "$CERT_NAME"
+    --non-interactive --agree-tos -m "$CERTBOT_EMAIL")
+  for domain in $CERT_DOMAINS; do certbot_args+=(-d "$domain"); done
+  [ "$CERTBOT_STAGING" -eq 0 ] || certbot_args+=(--staging)
+  if [ "$FORCE_RENEWAL" -eq 1 ]; then
+    certbot_args+=(--force-renewal)
+  else
+    # Idempotence: a certificate with more than 30 days left is left alone.
+    certbot_args+=(--keep-until-expiring)
+  fi
+
+  if [ ! -s "$CERT_DIR/fullchain.pem" ]; then
+    info "no lineage at $CERT_DIR — bootstrapping over plaintext"
+
+    # Only the challenge, and a redirect for everything else. This is the same
+    # port 80 block the real configuration ends with, minus everything that
+    # depends on a certificate.
+    cat >"/etc/nginx/sites-available/$SITE_NAME" <<EOF
+# Temporary: written by deploy/deploy.sh for the first ACME challenge only.
+# Replaced by deploy/nginx.conf as soon as the certificate exists.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${CERT_DOMAINS};
+
+    location /.well-known/acme-challenge/ {
+        root ${WEBROOT};
+    }
+
+    location / {
+        return 503;
+    }
+}
+EOF
+    ln -sfn "/etc/nginx/sites-available/$SITE_NAME" "/etc/nginx/sites-enabled/$SITE_NAME"
+    nginx_apply
+  else
+    expiry="$(openssl x509 -enddate -noout -in "$CERT_DIR/fullchain.pem" 2>/dev/null | cut -d= -f2)"
+    info "lineage exists${expiry:+, expires $expiry}"
+  fi
+
+  certbot "${certbot_args[@]}" >&2 ||
+    fail "certbot could not issue for $CERT_DOMAINS — check that DNS points here and 80/tcp is open"
+
+  [ -s "$CERT_DIR/fullchain.pem" ] ||
+    fail "certbot reported success but $CERT_DIR/fullchain.pem is not there"
+  info "certificate in place at $CERT_DIR"
+
+  # Renewal runs unattended from certbot's own timer. Nginx keeps the old
+  # certificate in memory until told otherwise, so the reload is the half of
+  # renewal that is this deployment's responsibility.
+  install -d -m 0755 /etc/letsencrypt/renewal-hooks/deploy
+  cat >/etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh <<'EOF'
+#!/bin/sh
+# Written by deploy/deploy.sh. Certbot renews the file; Nginx has to be told to
+# read it again, or it serves the expired one it already has in memory.
+set -eu
+nginx -t && systemctl reload nginx
+EOF
+  chmod 0755 /etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh
+
+  if systemctl list-unit-files certbot.timer >/dev/null 2>&1; then
+    systemctl enable --now certbot.timer >/dev/null 2>&1 || true
+    info "renewal: certbot.timer, reload hook installed"
+  else
+    info "renewal: no certbot.timer on this host — schedule 'certbot renew' yourself"
+  fi
+fi
+
 # --- reverse proxy ---------------------------------------------------------------
-# Last, and only once the application behind it is known to answer. `nginx -t`
-# gates the reload, so a bad configuration never reaches a running Nginx.
+# Last, and only once the application behind it is known to answer and the key
+# material it points at is on disk.
 
 step "Reverse proxy"
 
@@ -224,10 +376,8 @@ if [ "$SKIP_NGINX" -eq 1 ]; then
 else
   install -m 0644 "$NGINX_SRC" "/etc/nginx/sites-available/$SITE_NAME"
   ln -sfn "/etc/nginx/sites-available/$SITE_NAME" "/etc/nginx/sites-enabled/$SITE_NAME"
-
-  nginx -t >&2 || fail "nginx rejected the configuration; the running one was left alone"
-  systemctl reload nginx
-  info "nginx reloaded for $SITE_NAME"
+  nginx_apply
+  info "nginx serving $SITE_NAME"
 fi
 
 step "Deployed"

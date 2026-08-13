@@ -140,13 +140,43 @@ the deployment finished until `127.0.0.1:<PORT>/healthz` answers — the port re
 unit file, so the check cannot drift from what was installed. Nginx is reloaded last, and only
 behind a passing `nginx -t`.
 
-| Flag            | Effect                                                |
-| --------------- | ----------------------------------------------------- |
-| `--skip-verify` | Redeploy a tree that was already verified             |
-| `--skip-nginx`  | Service only; the reverse proxy lives on another host |
+It needs `deno`, `rsync`, `nginx` and `certbot` present, the DNS records for the domain already
+pointing at the host, and 80/tcp reachable from the internet for the ACME challenge.
 
-`APP_USER`, `APP_GROUP`, `APP_DIR`, `STATE_DIR`, `SERVICE_NAME` and `SITE_NAME` can be overridden
-from the environment (`sudo -E`). What it does, should you prefer to do it by hand:
+| Flag              | Effect                                                          |
+| ----------------- | --------------------------------------------------------------- |
+| `--skip-verify`   | Redeploy a tree that was already verified                       |
+| `--skip-nginx`    | Service only; the proxy lives elsewhere. Implies the next       |
+| `--skip-certbot`  | Leave certificates alone                                        |
+| `--staging`       | Issue from the staging CA: untrusted, but not rate limited      |
+| `--force-renewal` | Renew a certificate that is still valid. Rate limited by the CA |
+
+`APP_USER`, `APP_GROUP`, `APP_DIR`, `STATE_DIR`, `SERVICE_NAME`, `SITE_NAME`, `CERT_DOMAINS`,
+`CERTBOT_EMAIL` and `WEBROOT` can be overridden from the environment (`sudo -E`).
+
+### Certificates
+
+Handled by the script, before Nginx, because `deploy/nginx.conf` names its key material by absolute
+path and would not load without it. The first run has a chicken and egg to break — the certificate
+needs an answered HTTP challenge, the configuration needs the certificate — so it puts up a
+plaintext server block that serves `/.well-known/acme-challenge/` and answers everything else with
+503, issues, then replaces it with the real configuration. A host that already holds the lineage
+skips the bootstrap entirely: its live configuration already serves the challenge from the same
+webroot, and renewal costs no downtime.
+
+Renewal is `certbot.timer`, which the script enables. Certbot renews the file but Nginx goes on
+serving the copy in its memory, so the script also installs
+`/etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh` — the half of renewal that is the
+deployment's responsibility. Rehearse against the staging CA first; the real one is rate limited to
+five failures an hour per account.
+
+```sh
+sudo deploy/deploy.sh --staging     # rehearse: untrusted cert, no rate limit
+sudo deploy/deploy.sh               # then the real one
+sudo certbot certificates           # what is on disk and when it expires
+```
+
+What the script does, should you prefer to do it by hand:
 
 ```sh
 # 1. A user with no shell and no home directory to compromise.
@@ -164,10 +194,19 @@ sudo install -d -o pmdweb -g pmdweb -m 0750 /var/lib/pmd-web
 sudo -u pmdweb DENO_DIR=/var/lib/pmd-web/deno-cache \
   deno cache /srv/pmd-web/main.ts
 
-# 5. Service and reverse proxy.
+# 5. The service.
 sudo install -m 0644 deploy/pmd-web.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now pmd-web
 
+# 6. The certificate, over a plaintext server block that serves only the
+#    challenge — nginx.conf itself will not load until this exists.
+sudo install -d -m 0755 /var/www/certbot
+sudo certbot certonly --webroot -w /var/www/certbot \
+  --cert-name pedromdominguez.dev \
+  -d pedromdominguez.dev -d www.pedromdominguez.dev \
+  --non-interactive --agree-tos -m you@example.com --keep-until-expiring
+
+# 7. The reverse proxy.
 sudo install -m 0644 deploy/nginx.conf \
   /etc/nginx/sites-available/pedromdominguez.dev
 sudo ln -s /etc/nginx/sites-available/pedromdominguez.dev /etc/nginx/sites-enabled/

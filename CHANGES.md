@@ -7,7 +7,16 @@
   excludes `.git/`, `tests/` and the development `var/`, a module cache warmed as the service user
   for `--cached-only`, then unit install, restart, and a `/healthz` probe on the port read back out
   of the unit file. Nginx is reloaded last and only behind a passing `nginx -t`. `--skip-verify`,
-  `--skip-nginx`, and six environment overrides for a differently laid-out host.
+  `--skip-nginx`, and nine environment overrides for a differently laid-out host.
+- Certificates are part of that script rather than a separate errand. It issues with
+  `certbot certonly --webroot` before Nginx, since `deploy/nginx.conf` names its key material by
+  absolute path and will not load without it; a first run breaks the ACME chicken-and-egg with a
+  temporary plaintext server block serving only `/.well-known/acme-challenge/`, and a host that
+  already holds the lineage renews with no downtime at all. Preflight refuses a lineage name that
+  disagrees with the path in `nginx.conf`, which would otherwise install a certificate nobody
+  renews. `certbot.timer` is enabled and a deploy hook reloads Nginx after renewal — otherwise Nginx
+  serves the expired copy already in its memory. `--staging` rehearses against the staging CA,
+  `--force-renewal` and `--skip-certbot` cover the rest.
 - Default TCP port moved from `8000` to `8002`, in `src/config.ts` (`PORT` and `PUBLIC_ORIGIN`
   defaults), the systemd unit, the Nginx upstream and the README. Nothing hard-codes a port outside
   configuration, so a deployment that sets `PORT` explicitly is unaffected.
