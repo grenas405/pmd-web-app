@@ -17,7 +17,7 @@ Internet → Nginx → Deno → application functions
 Requires [Deno](https://deno.com) 2.x. Nothing else — there is no `npm install` and no build.
 
 ```sh
-deno task dev      # http://127.0.0.1:8000 with file watching
+deno task dev      # http://127.0.0.1:8002 with file watching
 deno task test     # 81 tests
 deno task verify   # fmt --check, lint, type check, tests
 ```
@@ -111,9 +111,9 @@ than producing surprising behaviour later.
 
 | Variable                      | Default                 | Meaning                                             |
 | ----------------------------- | ----------------------- | --------------------------------------------------- |
-| `PORT`                        | `8000`                  | TCP port                                            |
+| `PORT`                        | `8002`                  | TCP port                                            |
 | `HOST`                        | `127.0.0.1`             | Bind address. Keep it loopback behind Nginx         |
-| `PUBLIC_ORIGIN`               | `http://localhost:8000` | Canonical origin for URLs and CSRF checks           |
+| `PUBLIC_ORIGIN`               | `http://localhost:8002` | Canonical origin for URLs and CSRF checks           |
 | `TRUSTED_ORIGINS`             | _(empty)_               | Extra comma-separated origins accepted on POST      |
 | `STATIC_DIR`                  | `static`                | Directory served at `/static/*`                     |
 | `INBOX_PATH`                  | `var/inbox.jsonl`       | Where contact submissions are appended              |

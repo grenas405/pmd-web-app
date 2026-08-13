@@ -24,7 +24,7 @@ WorkingDirectory=/srv/pmd-web
 
 Environment=APP_ENV=production
 Environment=HOST=127.0.0.1
-Environment=PORT=8000
+Environment=PORT=8002
 Environment=PUBLIC_ORIGIN=https://pedromdominguez.dev
 Environment=ENABLE_HSTS=true
 Environment=TRUST_PROXY=true

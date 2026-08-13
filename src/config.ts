@@ -19,11 +19,11 @@ const originList = z
 
 const ConfigSchema = z.object({
   /** TCP port to bind. */
-  port: port.default(8000),
+  port: port.default(8002),
   /** Interface to bind. Bind loopback when Nginx terminates TLS in front. */
   hostname: z.string().min(1).default("127.0.0.1"),
   /** Canonical public origin, used for absolute URLs and Origin checks. */
-  origin: z.url({ protocol: /^https?$/ }).default("http://localhost:8000"),
+  origin: z.url({ protocol: /^https?$/ }).default("http://localhost:8002"),
   /** Extra origins accepted on state-changing requests (staging hosts, etc). */
   trustedOrigins: originList,
   /** Directory served verbatim at /static/*. */

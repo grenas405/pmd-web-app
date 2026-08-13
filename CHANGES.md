@@ -1,5 +1,11 @@
 # Changes
 
+## Unreleased
+
+- Default TCP port moved from `8000` to `8002`, in `src/config.ts` (`PORT` and `PUBLIC_ORIGIN`
+  defaults), the systemd unit, the Nginx upstream and the README. Nothing hard-codes a port outside
+  configuration, so a deployment that sets `PORT` explicitly is unaffected.
+
 ## 1.0.0 — 2026-08-08
 
 First release: the complete site, server, and deployment.

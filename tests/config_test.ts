@@ -4,7 +4,7 @@ import { allowedOrigins, parseConfig } from "../src/config.ts";
 Deno.test("an empty environment yields safe defaults", () => {
   const config = parseConfig({});
   assertEquals(config.hostname, "127.0.0.1", "the default bind must be loopback");
-  assertEquals(config.port, 8000);
+  assertEquals(config.port, 8002);
   assertEquals(config.env, "development");
   assertEquals(config.hsts, false);
   assertEquals(config.trustProxy, false, "a proxy must be opted into, never assumed");
