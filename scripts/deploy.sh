@@ -151,6 +151,16 @@ id -u "$OWNER_USER" >/dev/null 2>&1 || fail "no such user: $OWNER_USER"
 DENO="${DENO:-/usr/bin/deno}"
 [ -x "$DENO" ] ||
   fail "no deno at $DENO — install it there (sudo install -m 0755 ~/.deno/bin/deno /usr/bin/deno)"
+
+# -x above is answered for root, who can execute almost anything. The service
+# account is neither root nor in root's group, so what actually matters is the
+# other-execute bit — and `deno upgrade` has been known to rewrite the binary
+# without it, which surfaces much later as an unreadable "Permission denied".
+deno_mode="$(stat -c '%a' "$DENO")"
+case "${deno_mode: -1}" in
+  1 | 3 | 5 | 7) ;;
+  *) fail "$DENO is mode $deno_mode: $SERVICE_USER cannot execute it (sudo chmod 0755 $DENO)" ;;
+esac
 info "deno:    $DENO ($("$DENO" --version | head -n 1))"
 
 # The unit file is the single source of truth for the port. Reading it back
