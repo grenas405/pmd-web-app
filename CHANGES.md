@@ -5,15 +5,21 @@
 - Deployment now follows the layout the other Deno sites on this box use: `systemd/`, `nginx/`,
   `fail2ban/` and `scripts/` at the top level, in place of a single `deploy/` directory. The vhost
   is named after the site it serves (`nginx/pedromdominguez.dev`) rather than `nginx.conf`.
-- The application runs **from the checkout**, as the user who owns it, instead of being copied to
-  `/srv/pmd-web` under a dedicated system account. There is no second copy to drift out of step with
-  git; `systemctl cat pmd-web` names the directory you edit, and an update is `git pull` and a
-  redeploy. The unit's `User=`, `Group=`, `WorkingDirectory=`, `ConditionPathExists=` and
-  `ReadWritePaths=` are rewritten by `deploy.sh` for the host it runs on, so the committed file
-  keeps one readable set of placeholder paths. The trade is a service account that has a shell and a
-  home directory; the Deno allowlist, syscall filter and empty capability bounding set are
-  unchanged, and `ProtectSystem=full` with `ProtectHome=false` replaces `strict`, which cannot see a
-  checkout under `/home`.
+- The application runs **from the checkout** instead of a copy under `/srv/pmd-web`. There is no
+  second tree to drift out of step with git; `systemctl cat pmd-web` names the directory you edit,
+  and an update is `git pull` and a redeploy. The unit's `User=`, `Group=`, `WorkingDirectory=`,
+  `ConditionPathExists=`, `BindReadOnlyPaths=` and `BindPaths=` are rewritten by `deploy.sh` for the
+  host it runs on, so the committed file keeps one readable set of placeholder paths.
+- It does not run **as** the user who owns that checkout. `pmdweb` — system account, no shell, no
+  home — reaches the tree through the group, read-only, so a bug in the request path cannot rewrite
+  the code that runs at the next restart; the owner keeps write access and needs no root to
+  `git pull`. `var/` inverts it (`pmdweb:<owner>`, `2770`): the service writes the inbox, and the
+  owner writes because `deno task verify` runs the suite there.
+- `ProtectSystem=strict` and `ProtectHome=tmpfs`, with `BindReadOnlyPaths=` restoring exactly the
+  checkout and `BindPaths=` restoring `var/`. The whole hierarchy is read-only to the process, every
+  other home directory is an empty tmpfs, and file ownership says the same thing a second time. (An
+  earlier revision of this entry claimed `strict` could not be used with a checkout under `/home`.
+  That was wrong: `strict` mounts read-only, it does not hide — `ProtectHome=` is what hides.)
 - `/etc/pmd-web/pmd-web.env` (`EnvironmentFile=-`), with `systemd/pmd-web.env.example` in the repo.
   Installed only when absent: it is the one file meant to diverge from git. The module cache moved
   to `/var/cache/pmd-web/deno` under `CacheDirectory=`, and the interpreter to `/usr/bin/deno`.

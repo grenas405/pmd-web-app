@@ -138,9 +138,11 @@ Ubuntu LTS, Nginx, systemd, fail2ban — the same layout as the other Deno sites
 sudo scripts/deploy.sh
 ```
 
-The application runs **from the checkout**, as the user who owns it. There is no second copy under
-`/srv` to drift out of step with git: `systemctl cat pmd-web` names the directory you edit, and
-updating is a pull and a redeploy.
+The application runs **from the checkout**, but not **as** the user who owns it. There is no second
+copy under `/srv` to drift out of step with git — `systemctl cat pmd-web` names the directory you
+edit — and the code is still not writable by the process running it: the owner has write access and
+needs no root to `git pull`, while the service account `pmdweb` (no shell, no home) reaches the tree
+through the group, read-only.
 
 ```sh
 cd ~/.local/src/development/pmd-web-app
@@ -166,27 +168,37 @@ pointing at the host, and 80/tcp reachable for the ACME challenge.
 | `--staging`       | Issue from the staging CA: untrusted, but not rate limited      |
 | `--force-renewal` | Renew a certificate that is still valid. Rate limited by the CA |
 
-`APP_DIR`, `APP_USER`, `APP_GROUP`, `SERVICE_NAME`, `SITE_NAME`, `ENV_FILE`, `CERT_DOMAINS`,
-`CERTBOT_EMAIL` and `WEBROOT` can be overridden from the environment (`sudo -E`).
+`APP_DIR`, `OWNER_USER`, `OWNER_GROUP`, `SERVICE_USER`, `SERVICE_GROUP`, `SERVICE_NAME`,
+`SITE_NAME`, `ENV_FILE`, `CERT_DOMAINS`, `CERTBOT_EMAIL` and `WEBROOT` can be overridden from the
+environment (`sudo -E`).
 
 ### systemd
 
 The unit is [systemd/pmd-web.service](systemd/pmd-web.service), with an optional environment file at
 [systemd/pmd-web.env.example](systemd/pmd-web.env.example). It assumes:
 
-- the checkout is at `~/.local/src/development/pmd-web-app` and the service runs as its owner
+- the checkout is at `~/.local/src/development/pmd-web-app`, owned by you, group `pmdweb`, group
+  read-only — the service can execute the code and never alter it
 - Deno is installed at `/usr/bin/deno`
 - the module cache is `/var/cache/pmd-web/deno` (`CacheDirectory=`), so the unit can run
   `--cached-only` and never contact a registry — not at start, not after a restart at 3am
-- `var/` inside the checkout is the only writable path (`ReadWritePaths=`), and holds the inbox
+- `var/` inside the checkout is the only writable path, and holds the inbox. It is `pmdweb:<you>`
+  mode `2770`, because the service writes the inbox and `deno task verify` runs the suite in the
+  same directory
 - the app listens on `127.0.0.1:8002`
 
-`deploy.sh` rewrites `User=`, `Group=`, `WorkingDirectory=`, `ConditionPathExists=` and
-`ReadWritePaths=` for the host it runs on, so the committed unit keeps one set of readable
-placeholder paths instead of one commit per machine. Everything else — the Deno permission
-allowlist, the syscall filter, the empty capability bounding set — is the same in git and on the
-server. `/etc/pmd-web/pmd-web.env` overrides any of it and is installed **only when absent**: it is
-the one file meant to diverge from the repository.
+The kernel says the same thing the file modes do. `ProtectSystem=strict` mounts the entire hierarchy
+read-only and `ProtectHome=tmpfs` replaces every home directory with an empty tmpfs;
+`BindReadOnlyPaths=` then restores exactly this checkout, and `BindPaths=` restores `var/`. Nothing
+else on the filesystem exists as far as the process is concerned, and the two writable paths are
+`var/` and the module cache that `CacheDirectory=` provides.
+
+`deploy.sh` rewrites `User=`, `Group=`, `WorkingDirectory=`, `ConditionPathExists=`,
+`BindReadOnlyPaths=` and `BindPaths=` for the host it runs on, so the committed unit keeps one set
+of readable placeholder paths instead of one commit per machine. Everything else — the Deno
+permission allowlist, the syscall filter, the empty capability bounding set — is the same in git and
+on the server. `/etc/pmd-web/pmd-web.env` overrides any of it and is installed **only when absent**:
+it is the one file meant to diverge from the repository.
 
 ```sh
 sudo install -o root -g root -m 0644 systemd/pmd-web.service /etc/systemd/system/pmd-web.service
@@ -196,7 +208,7 @@ sudo systemctl daemon-reload && sudo systemctl enable --now pmd-web.service
 
 sudo systemd-analyze verify /etc/systemd/system/pmd-web.service
 journalctl -u pmd-web -f --output cat | jq .
-tail -f var/inbox.jsonl | jq .
+sudo -u pmdweb tail -f var/inbox.jsonl | jq .   # the inbox is 0600, owned by the service
 ```
 
 ### Server hardening (nginx + fail2ban)

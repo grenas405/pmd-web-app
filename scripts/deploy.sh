@@ -9,11 +9,11 @@
 #
 #   sudo scripts/deploy.sh
 #
-# The application runs from this checkout, as the user who owns it — there is
-# no second copy under /srv to drift out of step with git, and updating is
-# `git pull && sudo scripts/deploy.sh --skip-certbot`. What that costs is a
-# service account with a shell and a home directory; what it buys is one
-# location on disk that is unambiguously the running code.
+# The application runs from this checkout — there is no second copy under /srv
+# to drift out of step with git, and updating is `git pull && sudo
+# scripts/deploy.sh --skip-certbot`. It does not run *as* the user who owns the
+# checkout: a system account with no shell gets group read and nothing else, so
+# the running code is not writable by the process running it.
 #
 # Nothing here is specific to one host beyond the variables below, and each of
 # those can be overridden from the environment:
@@ -24,11 +24,15 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# The checkout is the deployment. The user is whoever invoked sudo, because
-# that is who owns the files systemd is about to run.
+# The checkout is the deployment, and two users share it. OWNER is whoever
+# invoked sudo: they own the files and can `git pull` without root. SERVICE is
+# a system account with no shell and no home that gets group read and nothing
+# else, so a bug in the request path cannot rewrite the code it runs.
 APP_DIR="${APP_DIR:-$REPO_ROOT}"
-APP_USER="${APP_USER:-${SUDO_USER:-root}}"
-APP_GROUP="${APP_GROUP:-$(id -gn "$APP_USER" 2>/dev/null || echo "$APP_USER")}"
+OWNER_USER="${OWNER_USER:-${SUDO_USER:-root}}"
+OWNER_GROUP="${OWNER_GROUP:-$(id -gn "$OWNER_USER" 2>/dev/null || echo "$OWNER_USER")}"
+SERVICE_USER="${SERVICE_USER:-pmdweb}"
+SERVICE_GROUP="${SERVICE_GROUP:-$SERVICE_USER}"
 SERVICE_NAME="${SERVICE_NAME:-pmd-web}"
 SITE_NAME="${SITE_NAME:-pedromdominguez.dev}"
 
@@ -86,8 +90,8 @@ usage: sudo scripts/deploy.sh [options]
                   Rate limited by the CA; do not put this in a loop.
   -h, --help      This text.
 
-Environment: APP_DIR, APP_USER, APP_GROUP, SERVICE_NAME, SITE_NAME, ENV_FILE,
-CERT_DOMAINS, CERTBOT_EMAIL, WEBROOT.
+Environment: APP_DIR, OWNER_USER, OWNER_GROUP, SERVICE_USER, SERVICE_GROUP,
+SERVICE_NAME, SITE_NAME, ENV_FILE, CERT_DOMAINS, CERTBOT_EMAIL, WEBROOT.
 EOF
 }
 
@@ -138,9 +142,9 @@ for cmd in systemctl install sed; do
   command -v "$cmd" >/dev/null 2>&1 || fail "$cmd is not installed"
 done
 
-id -u "$APP_USER" >/dev/null 2>&1 || fail "no such user: $APP_USER"
-[ "$APP_USER" != root ] ||
-  fail "refusing to run the service as root — invoke through sudo from a login user, or set APP_USER"
+id -u "$OWNER_USER" >/dev/null 2>&1 || fail "no such user: $OWNER_USER"
+[ "$OWNER_USER" != root ] ||
+  fail "refusing to deploy a root-owned checkout — invoke through sudo from a login user, or set OWNER_USER"
 
 # The unit names an absolute interpreter path, the same one portfolio-app uses
 # on this box. A ~/.deno/bin install is invisible to systemd and to root.
@@ -153,8 +157,8 @@ info "deno:    $DENO ($("$DENO" --version | head -n 1))"
 # here means the health check below cannot drift away from what was installed.
 APP_PORT="$(sed -n 's/^Environment=PORT=\([0-9]\+\).*/\1/p' "$UNIT_SRC" | tail -n 1)"
 [ -n "$APP_PORT" ] || fail "no Environment=PORT= line in $UNIT_SRC"
-info "source:  $APP_DIR"
-info "runs as: $APP_USER:$APP_GROUP on 127.0.0.1:$APP_PORT"
+info "source:  $APP_DIR (owned by $OWNER_USER:$SERVICE_GROUP)"
+info "runs as: $SERVICE_USER:$SERVICE_GROUP on 127.0.0.1:$APP_PORT"
 
 if [ "$SKIP_NGINX" -eq 0 ] && ! command -v nginx >/dev/null 2>&1; then
   fail "nginx is not installed (pass --skip-nginx if it lives elsewhere)"
@@ -194,13 +198,50 @@ step "Verify"
 if [ "$SKIP_VERIFY" -eq 1 ]; then
   info "skipped (--skip-verify)"
 else
+  # As the owner, not the service account: the service account has no home to
+  # cache into, and running the suite needs write access to the tree.
   # -H, not --preserve-env=HOME: sudo has already set HOME to /root, and a
   # deno running as the login user with that HOME cannot write its cache.
-  sudo -u "$APP_USER" -H -- \
+  sudo -u "$OWNER_USER" -H -- \
     sh -c "cd '$APP_DIR' && '$DENO' task verify" >&2 ||
     fail "the test suite did not pass — nothing was deployed"
   info "all checks passed"
 fi
+
+# --- account -------------------------------------------------------------------
+# No shell, no home directory, no password: there is nothing to log into and
+# nothing to leave behind. This account exists to read one directory.
+
+step "Account"
+
+if id -u "$SERVICE_USER" >/dev/null 2>&1; then
+  info "user $SERVICE_USER already exists"
+else
+  useradd --system --no-create-home --shell /usr/sbin/nologin "$SERVICE_USER"
+  info "created system user $SERVICE_USER"
+fi
+
+# --- ownership -----------------------------------------------------------------
+# The half of the sandbox that systemd cannot do. The owner keeps write access
+# so `git pull` needs no root; the service account reaches the tree only
+# through the group, read-only, and so cannot rewrite the code that will run at
+# the next restart. var/ is the single inversion: the service writes the inbox,
+# and the owner reads it through sudo.
+
+step "Ownership"
+
+chown -R "$OWNER_USER:$SERVICE_GROUP" "$APP_DIR"
+# X, not x: the execute bit reaches directories and already-executable files,
+# never a source file that has no business being executable.
+chmod -R g+rX,g-w,o-rwx "$APP_DIR"
+
+# var/ inverts it: the service owns the inbox and writes it, and the owner's
+# group writes too, because `deno task verify` runs the suite here (see the
+# INBOX_PATH in tests/app_test.ts) and the next deploy would fail at Verify if
+# it could not. setgid so anything either of them creates keeps the group.
+install -d -o "$SERVICE_USER" -g "$OWNER_GROUP" -m 2770 "$APP_DIR/var"
+info "$APP_DIR is $OWNER_USER:$SERVICE_GROUP, group read-only"
+info "$APP_DIR/var is $SERVICE_USER:$OWNER_GROUP, writable by both"
 
 # --- environment file ------------------------------------------------------------
 # Installed only when absent. It is the one file on the server that is meant to
@@ -213,7 +254,7 @@ install -d -m 0755 "$ENV_DIR"
 if [ -e "$ENV_FILE" ]; then
   info "$ENV_FILE exists, left alone"
 else
-  install -o root -g "$APP_GROUP" -m 0640 "$ENV_SRC" "$ENV_FILE"
+  install -o root -g "$SERVICE_GROUP" -m 0640 "$ENV_SRC" "$ENV_FILE"
   info "installed $ENV_FILE from the example — review it"
 fi
 
@@ -225,12 +266,9 @@ fi
 step "Module cache"
 
 DENO_CACHE="/var/cache/$SERVICE_NAME/deno"
-install -d -o "$APP_USER" -g "$APP_GROUP" -m 0750 "/var/cache/$SERVICE_NAME" "$DENO_CACHE"
-sudo -u "$APP_USER" DENO_DIR="$DENO_CACHE" "$DENO" cache "$APP_DIR/main.ts" >&2 ||
+install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 0750 "/var/cache/$SERVICE_NAME" "$DENO_CACHE"
+sudo -u "$SERVICE_USER" DENO_DIR="$DENO_CACHE" "$DENO" cache "$APP_DIR/main.ts" >&2 ||
   fail "could not populate the module cache at $DENO_CACHE"
-
-# The inbox directory, the only path in the checkout the service may write.
-install -d -o "$APP_USER" -g "$APP_GROUP" -m 0750 "$APP_DIR/var"
 info "cached into $DENO_CACHE"
 
 # --- service -----------------------------------------------------------------------
@@ -244,9 +282,10 @@ unit_tmp="$(mktemp)"
 trap 'rm -f "$unit_tmp"' EXIT
 sed -e "s|^\(ConditionPathExists=\).*|\1$APP_DIR/main.ts|" \
   -e "s|^\(WorkingDirectory=\).*|\1$APP_DIR|" \
-  -e "s|^\(ReadWritePaths=\).*|\1$APP_DIR/var|" \
-  -e "s|^\(User=\).*|\1$APP_USER|" \
-  -e "s|^\(Group=\).*|\1$APP_GROUP|" \
+  -e "s|^\(BindReadOnlyPaths=\).*|\1$APP_DIR|" \
+  -e "s|^\(BindPaths=\).*|\1$APP_DIR/var|" \
+  -e "s|^\(User=\).*|\1$SERVICE_USER|" \
+  -e "s|^\(Group=\).*|\1$SERVICE_GROUP|" \
   "$UNIT_SRC" >"$unit_tmp"
 
 install -o root -g root -m 0644 "$unit_tmp" "/etc/systemd/system/$SERVICE_NAME.service"
@@ -448,5 +487,5 @@ fi
 
 step "Deployed"
 info "journalctl -u $SERVICE_NAME -f --output cat | jq ."
-info "sudo -u $APP_USER tail -f $APP_DIR/var/inbox.jsonl | jq ."
+info "sudo -u $SERVICE_USER tail -f $APP_DIR/var/inbox.jsonl | jq ."
 info "sudo fail2ban-client status nginx-probes"

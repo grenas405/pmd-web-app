@@ -1,9 +1,17 @@
 # /etc/systemd/system/pmd-web.service
 #
-# The application runs from the checkout, as the login user who deployed it —
-# the same arrangement as portfolio-app on this box. There is no copy under
-# /srv to drift out of step with git: `git pull` and a restart is the whole
-# update, and `systemctl cat pmd-web` names the directory you edit.
+# The application runs from the checkout — there is no copy under /srv to drift
+# out of step with git: `git pull` and a restart is the whole update, and
+# `systemctl cat pmd-web` names the directory you edit.
+#
+# It does not run *as* the user who owns that checkout. The owner keeps write
+# access so `git pull` works without sudo; the service account gets group read
+# and nothing else, so a bug in the request path cannot rewrite the code that
+# will be executed at the next restart. Two users, one directory:
+#
+#   drwxr-x---  <owner>:pmdweb   the checkout  (owner writes, service reads)
+#   drwxrws---  pmdweb:<owner>   var/          (both write; the test suite runs
+#                                               here, and the inbox is 0600)
 #
 # The Deno permission flags and the systemd sandbox say the same thing twice,
 # from two directions: Deno refuses what the process asks for, and the kernel
@@ -13,9 +21,10 @@
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now pmd-web
 #
-# WorkingDirectory, ConditionPathExists, ReadWritePaths and User all name the
-# checkout. scripts/deploy.sh rewrites them for the host it runs on; edit them
-# by hand only if you install this file yourself.
+# WorkingDirectory, ConditionPathExists, BindReadOnlyPaths, BindPaths, User and
+# Group all name the checkout or its accounts. scripts/deploy.sh rewrites them
+# for the host it runs on; edit them by hand only if you install this file
+# yourself.
 
 [Unit]
 Description=pedromdominguez.dev — Deno web application
@@ -26,8 +35,8 @@ Wants=network-online.target
 
 [Service]
 Type=exec
-User=sysadmin
-Group=sysadmin
+User=pmdweb
+Group=pmdweb
 WorkingDirectory=/home/sysadmin/.local/src/development/pmd-web-app
 
 Environment=APP_ENV=production
@@ -59,13 +68,18 @@ KillSignal=SIGTERM
 TimeoutStopSec=20s
 
 # --- sandbox -----------------------------------------------------------------
-# ProtectHome=false because the checkout lives under /home; everything else is
-# as closed as it was when the code ran out of /srv.
+# strict mounts the entire hierarchy read-only — including the checkout, which
+# is the point — and the two Bind lines below carve out the exceptions.
+# ProtectHome=tmpfs replaces /home with an empty tmpfs, so no other user's home
+# directory exists as far as this process is concerned; the bind mounts are
+# applied afterwards and put back exactly one directory. If a systemd too old
+# to order those correctly ever refuses to start the unit, ProtectHome=read-only
+# is the fallback: it keeps the write protection and gives up only the hiding.
 NoNewPrivileges=true
 PrivateTmp=true
 PrivateDevices=true
-ProtectSystem=full
-ProtectHome=false
+ProtectSystem=strict
+ProtectHome=tmpfs
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectKernelLogs=true
@@ -87,10 +101,14 @@ AmbientCapabilities=
 UMask=0027
 
 # The module cache, resolved once at deploy time so --cached-only can hold.
+# CacheDirectory= is what makes /var/cache/pmd-web writable under strict.
 CacheDirectory=pmd-web
 
-# The inbox, and the only writable path in the checkout.
-ReadWritePaths=/home/sysadmin/.local/src/development/pmd-web-app/var
+# The checkout, read-only — the process can execute this code and never alter
+# it — and then the one directory it must write: the inbox. Order matters, the
+# read-write bind lands on top of the read-only one.
+BindReadOnlyPaths=/home/sysadmin/.local/src/development/pmd-web-app
+BindPaths=/home/sysadmin/.local/src/development/pmd-web-app/var
 
 # --- limits ------------------------------------------------------------------
 LimitNOFILE=8192
