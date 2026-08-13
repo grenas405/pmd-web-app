@@ -161,7 +161,20 @@ case "${deno_mode: -1}" in
   1 | 3 | 5 | 7) ;;
   *) fail "$DENO is mode $deno_mode: $SERVICE_USER cannot execute it (sudo chmod 0755 $DENO)" ;;
 esac
-info "deno:    $DENO ($("$DENO" --version | head -n 1))"
+
+# A symlink into a home directory is worse than it looks. The unit runs with
+# ProtectHome=tmpfs, so /home inside the service's namespace is empty: an
+# interpreter that resolves under /home does not exist at all as far as
+# systemd is concerned, and the unit fails to start with no useful message.
+# It must be a real file outside /home.
+deno_real="$(readlink -f "$DENO")"
+case "$deno_real" in
+  /home/*)
+    fail "$DENO resolves to $deno_real, under /home — the unit's ProtectHome=tmpfs hides it.
+       Install a real copy instead: sudo install -m 0755 $deno_real $DENO"
+    ;;
+esac
+info "deno:    $deno_real ($("$DENO" --version | head -n 1))"
 
 # The unit file is the single source of truth for the port. Reading it back
 # here means the health check below cannot drift away from what was installed.
@@ -277,9 +290,16 @@ step "Module cache"
 
 DENO_CACHE="/var/cache/$SERVICE_NAME/deno"
 install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 0750 "/var/cache/$SERVICE_NAME" "$DENO_CACHE"
-sudo -u "$SERVICE_USER" DENO_DIR="$DENO_CACHE" "$DENO" cache "$APP_DIR/main.ts" >&2 ||
+
+# As root, then handed over. Not as the service account: reaching the checkout
+# means traversing the owner's home directory, which is mode 0750 on any Ubuntu
+# since 21.04 and which the service account has no business being able to enter.
+# It does not need to at runtime either — ProtectHome=tmpfs and the bind mounts
+# give the unit the checkout at that path without any of its parents.
+DENO_DIR="$DENO_CACHE" "$DENO" cache "$APP_DIR/main.ts" >&2 ||
   fail "could not populate the module cache at $DENO_CACHE"
-info "cached into $DENO_CACHE"
+chown -R "$SERVICE_USER:$SERVICE_GROUP" "$DENO_CACHE"
+info "cached into $DENO_CACHE, owned by $SERVICE_USER"
 
 # --- service -----------------------------------------------------------------------
 # The unit in git carries placeholder paths for the machine it was written on.
