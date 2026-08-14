@@ -508,11 +508,25 @@ else
   # Restart, not reload: apt starts fail2ban before jail.local exists, and a
   # running daemon does not pick the file up any other way.
   systemctl restart fail2ban
-  if fail2ban-client status nginx-probes 2>/dev/null | grep -q "File list:"; then
-    info "jail nginx-probes is reading the access logs"
-  else
-    info "warning: nginx-probes is not tailing files — check 'backend = polling' in jail.local"
-  fi
+
+  # Two ways to be wrong, and they need different fixes: the jail can be
+  # missing from a jail.local this script declined to overwrite, or it can be
+  # present and reading the journal, where nginx access logs never appear.
+  jail_status="$(fail2ban-client status nginx-probes 2>&1 || true)"
+  case "$jail_status" in
+    *"File list:"*)
+      info "jail nginx-probes is reading the access logs"
+      ;;
+    *"Journal matches:"*)
+      info "warning: nginx-probes is reading the journal, where nginx logs never appear."
+      info "         add 'backend = polling' to its stanza in /etc/fail2ban/jail.local"
+      ;;
+    *)
+      info "warning: no working nginx-probes jail. fail2ban-client said:"
+      printf '        %s\n' "$jail_status" >&2
+      info "         this host's jail.local was left alone; add the stanza from $F2B_JAIL_SRC"
+      ;;
+  esac
 fi
 
 step "Deployed"
