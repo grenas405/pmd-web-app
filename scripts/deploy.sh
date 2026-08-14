@@ -509,10 +509,21 @@ else
   # running daemon does not pick the file up any other way.
   systemctl restart fail2ban
 
+  # systemctl returns before fail2ban has bound its socket, and a client that
+  # cannot connect looks exactly like a jail that does not exist. Ask until it
+  # answers something that is actually about the jail.
+  jail_status=""
+  for _ in $(seq 1 20); do
+    jail_status="$(fail2ban-client status nginx-probes 2>&1 || true)"
+    case "$jail_status" in
+      *"File list:"* | *"Journal matches:"* | *"does not exist"*) break ;;
+    esac
+    sleep 0.4
+  done
+
   # Two ways to be wrong, and they need different fixes: the jail can be
   # missing from a jail.local this script declined to overwrite, or it can be
   # present and reading the journal, where nginx access logs never appear.
-  jail_status="$(fail2ban-client status nginx-probes 2>&1 || true)"
   case "$jail_status" in
     *"File list:"*)
       info "jail nginx-probes is reading the access logs"
