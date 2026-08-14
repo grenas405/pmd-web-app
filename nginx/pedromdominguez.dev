@@ -16,6 +16,13 @@
 # below) and nginx/00-default-drop (the catch-all that closes the connection
 # on anything addressed to no server_name at all).
 #
+# 00-default-drop is a hard dependency, not a nicety. It is parsed first — the
+# `00-` prefix is why it is named that — and it is where `listen 443 ssl http2`
+# is declared. Protocol options belong to the address:port rather than to a
+# server block, so this file's `listen 443;` lines are deliberately bare and
+# inherit them. Install this vhost without 00-default-drop and :443 would serve
+# plaintext. scripts/deploy.sh always installs both, in that order.
+#
 # TLS is not Certbot-managed here. The settings below are explicit rather than
 # an `include /etc/letsencrypt/options-ssl-nginx.conf`, so that reading this
 # file tells you the whole policy, and so a fresh host needs nothing from
@@ -47,9 +54,11 @@ server {
 }
 
 server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    http2 on;
+    # Bare, with no `ssl` or `http2`: those are properties of the socket, and
+    # nginx/00-default-drop has already set them for :443. Repeating them here
+    # earns a "protocol options redefined" warning and changes nothing.
+    listen 443;
+    listen [::]:443;
     server_name www.pedromdominguez.dev;
 
     ssl_certificate     /etc/letsencrypt/live/pedromdominguez.dev/fullchain.pem;
@@ -59,9 +68,8 @@ server {
 }
 
 server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    http2 on;
+    listen 443;
+    listen [::]:443;
     server_name pedromdominguez.dev;
 
     ssl_certificate     /etc/letsencrypt/live/pedromdominguez.dev/fullchain.pem;

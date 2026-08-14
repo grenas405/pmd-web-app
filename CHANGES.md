@@ -23,6 +23,12 @@
 - `/etc/pmd-web/pmd-web.env` (`EnvironmentFile=-`), with `systemd/pmd-web.env.example` in the repo.
   Installed only when absent: it is the one file meant to diverge from git. The module cache moved
   to `/var/cache/pmd-web/deno` under `CacheDirectory=`, and the interpreter to `/usr/bin/deno`.
+- The `listen` protocol options moved to `nginx/00-default-drop`, which is the first file nginx
+  parses and therefore the one that gets to set them: `ssl` and `http2` describe an address:port,
+  not a server block. The vhost's `listen 443;` lines are now bare and inherit both, which drops the
+  "protocol options redefined for 0.0.0.0:443" warnings. The standalone `http2 on;` directive is
+  gone with them — it needs nginx >= 1.25.1 and was an `unknown directive` error on anything older;
+  `http2` as a listen parameter works on both.
 - Box-wide hardening, tracked and installed by the same script: `nginx/snippets/deny-probes.conf`
   (444 on PHP/WordPress/dotfile probes, included by the vhost), `nginx/00-default-drop` (catch-all
   `default_server` closing the connection on any unmatched `Host`, and the distro default site
