@@ -5,6 +5,9 @@
  * never means touching how the site *works*. Edit this file to rebrand.
  */
 
+import { faq } from "./faq.ts";
+import { plan } from "./pricing.ts";
+
 export interface NavLink {
   readonly href: string;
   readonly label: string;
@@ -25,7 +28,11 @@ export const site = {
   description:
     "Pedro M. Dominguez builds and looks after websites and business software for Oklahoma City " +
     "companies. One engineer, working with AI, at a pace that used to take a whole agency.",
-  email: "pedro.dfedro@gmail.com",
+  email: "domingueztechsolutions@gmail.com",
+  /** Texting is the fastest way to reach him, and the only one advertised. */
+  phone: "405-984-7036",
+  phoneHref: "sms:+14059847036",
+  phoneNote: "Text only",
   github: "https://github.com/grenas405",
   locality: "Oklahoma City",
   region: "OK",
@@ -71,9 +78,15 @@ export const nav: readonly NavLink[] = [
     description: "From counter to launch",
   },
   {
+    href: "/pricing",
+    label: "Pricing",
+    index: "05",
+    description: "What it costs, in full",
+  },
+  {
     href: "#contact",
     label: "Contact",
-    index: "05",
+    index: "06",
     description: "Start a project",
   },
 ];
@@ -84,8 +97,14 @@ export function absoluteUrl(origin: string, path: string): string {
 }
 
 /**
- * JSON-LD describing the person and the practice. Serialised once at startup so
- * its Content-Security-Policy hash stays stable across requests.
+ * JSON-LD describing the person, the practice, what it costs and the questions
+ * people ask. Serialised once at startup so its Content-Security-Policy hash
+ * stays stable across requests.
+ *
+ * One `@graph` rather than several `<script>` blocks: the policy admits inline
+ * scripts by hash, and every extra block would be another hash to compute and
+ * keep in step. The FAQ and the offer are the same business as the Person above
+ * them, so one graph is also the more accurate description.
  */
 export function structuredData(origin: string): string {
   return JSON.stringify({
@@ -97,6 +116,7 @@ export function structuredData(origin: string): string {
         name: site.name,
         url: origin,
         email: `mailto:${site.email}`,
+        telephone: site.phone,
         jobTitle: "Software Engineer",
         sameAs: [site.github],
         address: {
@@ -127,6 +147,38 @@ export function structuredData(origin: string): string {
           name: site.locality,
           containedInPlace: { "@type": "State", name: site.regionName },
         },
+        // Texting is the only channel advertised, so it is the only one
+        // described here. contactType is a free-text field; "text message"
+        // is what a person would say.
+        contactPoint: {
+          "@type": "ContactPoint",
+          contactType: "text message",
+          telephone: site.phone,
+          email: site.email,
+          areaServed: site.region,
+          availableLanguage: "English",
+        },
+        makesOffer: {
+          "@type": "Offer",
+          "@id": `${origin}/pricing#${plan.id}`,
+          name: `${plan.name} — website build and care`,
+          url: `${origin}/pricing`,
+          priceCurrency: "USD",
+          price: plan.build,
+          description:
+            `$${plan.build} to design, build and launch on a ${plan.termMonths}-month agreement, ` +
+            `then $${plan.care} a month for care, support and hosting. First year of domain ` +
+            `management included; $${plan.firstYear} for the first year in total.`,
+        },
+      },
+      {
+        "@type": "FAQPage",
+        "@id": `${origin}/#faq`,
+        mainEntity: faq.map((entry) => ({
+          "@type": "Question",
+          name: entry.question,
+          acceptedAnswer: { "@type": "Answer", text: entry.answer },
+        })),
       },
     ],
   });

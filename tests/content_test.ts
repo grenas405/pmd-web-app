@@ -6,6 +6,8 @@
 
 import { assert, assertEquals } from "@std/assert";
 import { liveSites } from "../src/content/live.ts";
+import { faq } from "../src/content/faq.ts";
+import { comparison, included, notIncluded, plan, sources } from "../src/content/pricing.ts";
 import { nav } from "../src/content/site.ts";
 import {
   session,
@@ -91,7 +93,12 @@ Deno.test("every nav entry can fill a row of the menu", () => {
     assert(link.description.trim().length > 0, `${link.label} has no description`);
     assert(/^\d{2}$/.test(link.index), `${link.label} index is not zero-padded: ${link.index}`);
 
-    assert(link.href.startsWith("#"), `${link.href} is not an in-page anchor`);
+    // Pricing is a page; the rest are anchors on this one. Both are legitimate
+    // menu destinations, and neither may be an off-site URL.
+    assert(
+      link.href.startsWith("#") || link.href.startsWith("/"),
+      `${link.href} is neither an in-page anchor nor a site path`,
+    );
     assert(!indexes.has(link.index), `index ${link.index} is used twice`);
     indexes.add(link.index);
   }
@@ -112,5 +119,55 @@ Deno.test("live sites are unique, hostname-shaped and scheme-free", () => {
 
     assert(!hosts.has(entry.host), `${entry.host} is listed twice`);
     hosts.add(entry.host);
+  }
+});
+
+Deno.test("the pricing arithmetic on the page adds up", () => {
+  // The page prints all three of these. If the first year ever stops being the
+  // build plus twelve months of care, the copy is lying to a customer.
+  assertEquals(plan.build, 295);
+  assertEquals(plan.care, 20);
+  assertEquals(plan.termMonths, 12);
+  assertEquals(plan.firstYear, 535);
+  assertEquals(plan.firstYear, plan.build + plan.care * plan.termMonths);
+  assertEquals(plan.perYearAfter, 240);
+});
+
+Deno.test("every comparison figure names a source that exists", () => {
+  assert(comparison.length > 0);
+  for (const row of comparison) {
+    assert(row.label.trim().length > 0);
+    assert(row.typical.trim().length > 0);
+    assert(row.here.trim().length > 0);
+    // A footnote marker pointing at nothing is worse than no footnote: the
+    // claim would read as sourced while being unattributable.
+    assert(
+      row.source >= 0 && row.source < sources.length,
+      `${row.label} cites source ${row.source}, which does not exist`,
+    );
+  }
+
+  for (const source of sources) {
+    assert(source.url.startsWith("https://"), `${source.label} is not an https source`);
+    assert(source.note.trim().length > 0, `${source.label} has no note saying what it supports`);
+  }
+});
+
+Deno.test("what is and is not included are both stated", () => {
+  assert(included.length > 0);
+  assert(notIncluded.length > 0, "a price with no exclusions listed is a price with surprises");
+  for (const item of [...included, ...notIncluded]) assert(item.trim().length > 0);
+});
+
+Deno.test("every FAQ entry is a real question with a real answer", () => {
+  assert(faq.length >= 6, "fewer than six answers is not an FAQ, it is a hint");
+
+  const asked = new Set<string>();
+  for (const entry of faq) {
+    assert(entry.question.trim().endsWith("?"), `not a question: ${entry.question}`);
+    // These become FAQPage answers in search results, where they appear alone.
+    assert(entry.answer.trim().length > 40, `${entry.question} has a stub for an answer`);
+    assert(!asked.has(entry.question), `asked twice: ${entry.question}`);
+    asked.add(entry.question);
   }
 });

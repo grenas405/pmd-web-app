@@ -28,8 +28,10 @@ const ConfigSchema = z.object({
   trustedOrigins: originList,
   /** Directory served verbatim at /static/*. */
   staticDir: z.string().min(1).default("static"),
-  /** Where contact submissions are appended as JSON Lines. */
+  /** Where contact submissions are appended as JSON Lines. Historical only. */
   inboxPath: z.string().min(1).default("var/inbox.jsonl"),
+  /** Deno KV database holding enquiries. Lives in the one writable directory. */
+  kvPath: z.string().min(1).default("var/kv.sqlite3"),
   /** "development" relaxes caching and prints readable logs. */
   env: z.enum(["development", "production"]).default("development"),
   /** Emit Strict-Transport-Security. Only meaningful behind HTTPS. */
@@ -53,6 +55,7 @@ export function parseConfig(env: Record<string, string | undefined>): Config {
     trustedOrigins: env.TRUSTED_ORIGINS,
     staticDir: env.STATIC_DIR,
     inboxPath: env.INBOX_PATH,
+    kvPath: env.KV_PATH,
     env: env.APP_ENV,
     hsts: env.ENABLE_HSTS,
     trustProxy: env.TRUST_PROXY,
@@ -71,6 +74,7 @@ export function loadConfig(): Config {
     "TRUSTED_ORIGINS",
     "STATIC_DIR",
     "INBOX_PATH",
+    "KV_PATH",
     "APP_ENV",
     "ENABLE_HSTS",
     "TRUST_PROXY",

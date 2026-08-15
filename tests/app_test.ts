@@ -13,13 +13,18 @@ import { silentLogger } from "../src/log.ts";
 import { scriptHash } from "../src/http/security.ts";
 import { inlineScriptHashes } from "../src/render/layout.ts";
 import { nav } from "../src/content/site.ts";
+import { faq } from "../src/content/faq.ts";
+import { comparison, plan, PLAN_ID, sources } from "../src/content/pricing.ts";
+import { recentInquiries } from "../src/contact/store.ts";
 import { structuredData } from "../src/content/site.ts";
 
 const ORIGIN = "https://pedromdominguez.dev";
 
-// Written inside `var/` so the suite runs under the same write permission the
-// server itself is granted: --allow-write=var and nothing more.
+// Each app gets its own in-memory KV, so tests neither share enquiries nor
+// leave a database behind. The handle is returned alongside the app for the
+// tests that need to read back what was stored.
 async function buildApp(overrides: Record<string, string> = {}) {
+  const kv = await Deno.openKv(":memory:");
   const config = parseConfig({
     PUBLIC_ORIGIN: ORIGIN,
     APP_ENV: "production",
@@ -33,7 +38,29 @@ async function buildApp(overrides: Record<string, string> = {}) {
     render: { origin: config.origin, asset: (path) => `/static${path}`, jsonLd },
     security: { hsts: config.hsts, scriptHashes: await inlineScriptHashes(jsonLd) },
     startedAt: new Date("2026-01-01T00:00:00Z"),
+    kv,
   });
+}
+
+/** For the tests that assert on what was stored, not just what was answered. */
+async function buildAppWithKv(overrides: Record<string, string> = {}) {
+  const kv = await Deno.openKv(":memory:");
+  const config = parseConfig({
+    PUBLIC_ORIGIN: ORIGIN,
+    APP_ENV: "production",
+    INBOX_PATH: `var/test/${crypto.randomUUID()}.jsonl`,
+    ...overrides,
+  });
+  const jsonLd = structuredData(config.origin);
+  const app = createApp({
+    config,
+    logger: silentLogger,
+    render: { origin: config.origin, asset: (path) => `/static${path}`, jsonLd },
+    security: { hsts: config.hsts, scriptHashes: await inlineScriptHashes(jsonLd) },
+    startedAt: new Date("2026-01-01T00:00:00Z"),
+    kv,
+  });
+  return { app, kv };
 }
 
 const get = (path: string, init: RequestInit = {}) =>
@@ -272,4 +299,82 @@ Deno.test("a submitted script tag is rendered back as text, not markup", async (
   const body = await response.text();
   assert(!body.includes("<script>alert(1)</script>"), "submitted markup was echoed unescaped");
   assertStringIncludes(body, "&lt;script&gt;alert(1)&lt;/script&gt;");
+});
+
+Deno.test("the pricing page states the price and the arithmetic behind it", async () => {
+  const app = await buildApp();
+  const response = await app(get("/pricing"), "203.0.113.1");
+  assertEquals(response.status, 200);
+
+  const body = await response.text();
+  // All three numbers, because the page that shows only two invites the text
+  // message it exists to prevent.
+  assertStringIncludes(body, `$${plan.build}`);
+  assertStringIncludes(body, `$${plan.care}`);
+  assertStringIncludes(body, `$${plan.firstYear}`);
+
+  for (const row of comparison) assertStringIncludes(body, row.typical);
+  for (const source of sources) assertStringIncludes(body, source.url);
+});
+
+Deno.test("the landing page carries the offer and the questions", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  assertStringIncludes(body, `$${plan.build}`);
+  assertStringIncludes(body, "/pricing");
+  for (const entry of faq) assertStringIncludes(body, entry.question);
+
+  // The answers are also structured data, which is what can put them in a
+  // search result rather than only on the page.
+  assertStringIncludes(body, "FAQPage");
+});
+
+Deno.test("a plan we offer reaches the form; anything else does not", async () => {
+  const app = await buildApp();
+
+  const carried = await (await app(get(`/?plan=${PLAN_ID}`), "203.0.113.1")).text();
+  assertStringIncludes(carried, `name="plan"`);
+  assertStringIncludes(carried, `value="${PLAN_ID}"`);
+
+  // An unknown value is ignored rather than echoed into the page.
+  const nonsense = await (await app(get("/?plan=free-forever"), "203.0.113.1")).text();
+  assert(!nonsense.includes(`name="plan"`), "an unknown plan was rendered into the form");
+  assert(!nonsense.includes("free-forever"), "an unknown plan was echoed back");
+});
+
+Deno.test("a pricing enquiry is stored as one, and a plain one is not", async () => {
+  const { app, kv } = await buildAppWithKv();
+  try {
+    const priced = await app(form(`${VALID}&plan=${PLAN_ID}`), "203.0.113.7");
+    assertEquals(priced.status, 200);
+
+    const plain = await app(form(VALID), "203.0.113.8");
+    assertEquals(plain.status, 200);
+
+    const stored = await recentInquiries(kv);
+    assertEquals(stored.length, 2);
+    assertEquals(stored.filter((r) => r.kind === "pricing").length, 1);
+    assertEquals(stored.filter((r) => r.kind === "contact").length, 1);
+    assertEquals(stored.find((r) => r.kind === "pricing")?.plan, PLAN_ID);
+  } finally {
+    kv.close();
+  }
+});
+
+Deno.test("a tampered plan is dropped, not turned into an error", async () => {
+  const { app, kv } = await buildAppWithKv();
+  try {
+    // The visitor cannot see or correct this field, so a bad value must never
+    // become a validation message they are asked to fix.
+    const response = await app(form(`${VALID}&plan=enterprise-0`), "203.0.113.9");
+    assertEquals(response.status, 200);
+
+    const stored = await recentInquiries(kv);
+    assertEquals(stored.length, 1);
+    assertEquals(stored[0]?.kind, "contact");
+    assertEquals(stored[0]?.plan, null);
+  } finally {
+    kv.close();
+  }
 });

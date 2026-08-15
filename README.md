@@ -18,7 +18,7 @@ Requires [Deno](https://deno.com) 2.x. Nothing else — there is no `npm install
 
 ```sh
 deno task dev      # http://127.0.0.1:8002 with file watching
-deno task test     # 87 tests
+deno task test     # 112 tests
 deno task verify   # fmt --check, lint, type check, tests
 ```
 
@@ -53,7 +53,7 @@ touches the environment.
 | `src/render/layout.ts`  | Document shell: head, masthead, footer, sky                                 |
 | `src/pages/*.ts`        | Page composition. Pure functions of (context, data)                         |
 | `src/content/*.ts`      | Copy, portfolio, the hero session and the live-site roster, as plain data   |
-| `src/contact/*.ts`      | Contact schema (pure) and inbox append (the only disk write)                |
+| `src/contact/*.ts`      | Contact schema (pure) and the enquiry store (the only writer)               |
 | `static/`               | CSS, ES modules, images, vendored font and Anime.js                         |
 | `systemd/`              | The unit and its optional environment file                                  |
 | `nginx/`                | The vhost, plus the box-wide probe snippet and catch-all server             |
@@ -68,8 +68,10 @@ touches the environment.
   sees it, and the parsed value is the only thing that travels onward.
 - **Pure where possible.** Path resolution, routing, escaping, validation, rate limiting and page
   rendering are pure functions — which is why they have tests.
-- **I/O is named and contained.** Exactly one module writes to disk (`src/contact/inbox.ts`), one
-  reads it (`src/http/static.ts`, plus asset indexing), one reads the environment (`src/config.ts`).
+- **I/O is named and contained.** Exactly one module persists anything (`src/contact/store.ts`,
+  which writes to Deno KV), one reads files (`src/http/static.ts`, plus asset indexing), one reads
+  the environment (`src/config.ts`). The KV handle is opened once in `main.ts` and passed down like
+  every other dependency — no module reaches for a global.
 
 ---
 
@@ -122,7 +124,8 @@ than producing surprising behaviour later.
 | `PUBLIC_ORIGIN`               | `http://localhost:8002` | Canonical origin for URLs and CSRF checks           |
 | `TRUSTED_ORIGINS`             | _(empty)_               | Extra comma-separated origins accepted on POST      |
 | `STATIC_DIR`                  | `static`                | Directory served at `/static/*`                     |
-| `INBOX_PATH`                  | `var/inbox.jsonl`       | Where contact submissions are appended              |
+| `INBOX_PATH`                  | `var/inbox.jsonl`       | Legacy JSON Lines inbox; historical records only    |
+| `KV_PATH`                     | `var/kv.sqlite3`        | Deno KV database holding enquiries                  |
 | `APP_ENV`                     | `development`           | `production` raises the log threshold               |
 | `ENABLE_HSTS`                 | `false`                 | Send HSTS + `upgrade-insecure-requests`. HTTPS only |
 | `TRUST_PROXY`                 | `false`                 | Honour `X-Forwarded-For`. True only behind a proxy  |
@@ -185,9 +188,12 @@ The unit is [systemd/pmd-web.service](systemd/pmd-web.service), with an optional
 - Deno is installed at `/usr/bin/deno`
 - the module cache is `/var/cache/pmd-web/deno` (`CacheDirectory=`), so the unit can run
   `--cached-only` and never contact a registry — not at start, not after a restart at 3am
-- `var/` inside the checkout is the only writable path, and holds the inbox. It is `pmdweb:<you>`
-  mode `2770`, because the service writes the inbox and `deno task verify` runs the suite in the
-  same directory
+- `var/` inside the checkout is the only writable path, and holds the enquiry database. It is
+  `pmdweb:<you>` mode `2770`, because the service writes it and `deno task verify` runs the suite in
+  the same directory
+- `--unstable-kv` is on the `ExecStart` line, because `Deno.openKv` needs it. The database is a file
+  inside `var/`, so it costs no permission the service did not already have — but without the flag
+  the process exits at startup, which is why the flag and the code deploy together
 - the app listens on `127.0.0.1:8002`
 
 The kernel says the same thing the file modes do. `ProtectSystem=strict` mounts the entire hierarchy
@@ -211,7 +217,7 @@ sudo systemctl daemon-reload && sudo systemctl enable --now pmd-web.service
 
 sudo systemd-analyze verify /etc/systemd/system/pmd-web.service
 journalctl -u pmd-web -f --output cat | jq .
-sudo -u pmdweb tail -f var/inbox.jsonl | jq .   # the inbox is 0600, owned by the service
+sudo -u pmdweb deno task inbox | jq .   # enquiries live in KV, owned by the service
 ```
 
 ### Server hardening (nginx + fail2ban)

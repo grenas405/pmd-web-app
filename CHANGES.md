@@ -30,6 +30,53 @@
 - Desktop is untouched: at 60rem the same markup flattens back into the masthead row it has always
   been, with the indexes and descriptions hidden.
 
+### It says what it costs
+
+- **A pricing page at `/pricing`.** One plan: $295 to design, build and launch on a twelve-month
+  agreement, then $20 a month for care, support and hosting, with the first year of domain
+  management included. The page prints the arithmetic — $295 + $240 = **$535 for the first year**,
+  $240 a year after — rather than leaving a reader to work it out or text to ask. `firstYear` is
+  computed in `src/content/pricing.ts` and asserted by a test, so the copy cannot drift from the
+  number above it.
+- **A promotional section on the landing page** making the argument that a business can own its
+  software at about a tenth of what it used to cost, because there is one person instead of a firm
+  and AI does the mechanical half of the work.
+- **The comparison is sourced.** Published 2026 ranges — $8,000–$15,000 for a boutique-agency build,
+  $3,600–$12,720 a year to keep it running, $5,000–$30,000 for an agency build elsewhere — each row
+  footnoted to the page it came from, and framed as industry ranges rather than as any named firm's
+  price. "About a tenth" is measured against the _cheapest_ published first year ($6,600), where the
+  true multiple is about a twelfth; against the agency figures it is nearer a twentieth. A claim
+  that survives being checked against the low end is the only kind worth printing.
+- **An FAQ** of eight questions — what do I own, what if I leave, who fixes it, how is it this
+  cheap, what is not included — on the landing page and emitted as schema.org `FAQPage` data so the
+  answers can appear in search results. It joins the existing `@graph` rather than becoming a second
+  `<script>`, so the Content-Security-Policy still carries one hash and no nonce.
+- **New contact details**: `domingueztechsolutions@gmail.com` and **405-984-7036, text only**. The
+  number links as `sms:` and is written out in full for anyone reading on a desktop, and it is in
+  the structured data as a `ContactPoint` of type "text message".
+
+### Enquiries move to Deno KV
+
+- `src/contact/inbox.ts` becomes `src/contact/store.ts`, and enquiries are written to Deno KV
+  instead of appended to `var/inbox.jsonl`. There are two doors in now — the contact form and the
+  pricing page — and a lead is worth being able to read back in order and filter by kind. The
+  database is a file in the same `var/` directory, so it needs no permission the service did not
+  already have; `toRecord` stays pure and keeps its tests.
+- Keys are `["inquiry", receivedAt, id]`: time first so a reversed list is newest first, and a
+  random id last so two submissions in the same millisecond cannot overwrite each other.
+- **`deno task inbox`** replaces `tail -f var/inbox.jsonl`, printing recent enquiries newest first,
+  one JSON object per line, so `jq` works exactly as it did. Losing the ability to read your own
+  leads would have been a regression dressed up as an upgrade.
+- `--unstable-kv` is now on all four `deno.json` tasks and on the unit's `ExecStart`, and `KV_PATH`
+  joins the unit's `--allow-env` allowlist. The flag and the code deploy together, so a service
+  cannot come up without it. The old `var/inbox.jsonl` is left on disk and readable; nothing
+  migrates it.
+- A submission arriving from the pricing page carries `plan=launch-295` as a hidden field, so it is
+  stored as a `pricing` enquiry rather than a `contact` one. The plan travels in the query string
+  (`/?plan=launch-295#contact`) and is rendered server-side, so it survives with JavaScript off. An
+  unknown or tampered value is dropped rather than turned into a validation error the visitor cannot
+  see or fix.
+
 ### The page speaks to business owners
 
 - The hero session now shows the work that is actually for sale. It was a small feature being added

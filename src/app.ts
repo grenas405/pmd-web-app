@@ -25,6 +25,13 @@ import type { RenderContext } from "./render/context.ts";
 import { renderHome } from "./pages/home.ts";
 import { renderError, renderNotFound, renderThanks } from "./pages/simple.ts";
 import { IDLE_FORM } from "./routes/contact_state.ts";
+import { renderPricing } from "./pages/pricing.ts";
+import { PLAN_ID, type PlanId } from "./content/pricing.ts";
+
+/** The plan named in `?plan=`, if we offer it. Anything else is ignored. */
+function planFromQuery(url: URL): PlanId | undefined {
+  return url.searchParams.get("plan") === PLAN_ID ? PLAN_ID : undefined;
+}
 import { createContactHandler } from "./routes/contact.ts";
 import { humansTxt, manifestJson, robotsTxt, sitemapXml } from "./routes/meta.ts";
 
@@ -34,6 +41,7 @@ export interface AppDeps {
   readonly render: RenderContext;
   readonly security: SecurityOptions;
   readonly startedAt: Date;
+  readonly kv: Deno.Kv;
 }
 
 function buildRoutes(deps: AppDeps): readonly Route[] {
@@ -47,12 +55,23 @@ function buildRoutes(deps: AppDeps): readonly Route[] {
     logger: deps.logger,
     limiter,
     render: deps.render,
+    kv: deps.kv,
   });
 
   const page = (render: () => Response): Handler => () => render();
 
   return [
-    route("GET", "/", page(() => htmlResponse(renderHome(deps.render, IDLE_FORM)))),
+    route("GET", "/", ({ url }) =>
+      htmlResponse(
+        // Arriving from the pricing page carries the plan through in the query
+        // string, so the hidden field survives with JavaScript switched off.
+        renderHome(deps.render, IDLE_FORM, planFromQuery(url)),
+      )),
+    route(
+      "GET",
+      "/pricing",
+      page(() => htmlResponse(renderPricing(deps.render), { cacheControl: CACHE_PAGE })),
+    ),
     route(
       "GET",
       "/thank-you",

@@ -24,6 +24,12 @@ export async function start(): Promise<Deno.HttpServer> {
 
   const assets = await indexAssets(config.staticDir);
 
+  // One handle for the process, opened here and passed down: no module reaches
+  // for a global, and the same rule that governs config and the logger governs
+  // storage. The file lives in `var/`, the one writable directory the service
+  // has.
+  const kv = await Deno.openKv(config.kvPath);
+
   const jsonLd = structuredData(config.origin);
   // The hashes come from the module that emits the scripts, so the policy and
   // the page cannot drift. Still no 'unsafe-inline' and no nonce.
@@ -38,7 +44,7 @@ export async function start(): Promise<Deno.HttpServer> {
     jsonLd,
   };
 
-  const app = createApp({ config, logger, render, security, startedAt });
+  const app = createApp({ config, logger, render, security, startedAt, kv });
 
   const server = Deno.serve({
     port: config.port,
@@ -63,7 +69,7 @@ export async function start(): Promise<Deno.HttpServer> {
   // rather than dropping them.
   const shutdown = () => {
     logger.info("server.shutdown");
-    void server.shutdown();
+    void server.shutdown().finally(() => kv.close());
   };
   Deno.addSignalListener("SIGTERM", shutdown);
   Deno.addSignalListener("SIGINT", shutdown);

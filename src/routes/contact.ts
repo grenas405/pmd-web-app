@@ -27,25 +27,33 @@ import {
   redirect,
   statusMessage,
 } from "../http/respond.ts";
-import { appendToInbox, toRecord } from "../contact/inbox.ts";
+import { saveInquiry, toRecord } from "../contact/store.ts";
 import { echoValues, parseContact } from "../contact/message.ts";
 import { renderHome } from "../pages/home.ts";
 import type { RenderContext } from "../render/context.ts";
 import { type ContactFormState, SENT_MESSAGE } from "./contact_state.ts";
+import { PLAN_ID, type PlanId } from "../content/pricing.ts";
 
 export interface ContactDeps {
   readonly config: Config;
   readonly logger: Logger;
   readonly limiter: RateLimiter;
   readonly render: RenderContext;
+  readonly kv: Deno.Kv;
 }
 
 /** Render the answer in whichever form the client asked for. */
+/** The plan a submission claimed, if it is one we offer. Pure. */
+function planOf(fields: Record<string, unknown>): PlanId | undefined {
+  return fields.plan === PLAN_ID ? PLAN_ID : undefined;
+}
+
 function answer(
   deps: ContactDeps,
   context: RouteContext,
   status: number,
   state: ContactFormState,
+  plan?: PlanId,
 ): Response {
   if (prefersJson(context.request)) {
     const body = state.status === "sent"
@@ -56,7 +64,7 @@ function answer(
   // Post/Redirect/Get for the no-JavaScript path: a refresh after success must
   // not resubmit the form.
   if (state.status === "sent") return redirect("/thank-you", 303);
-  return htmlResponse(renderHome(deps.render, state), { status, cacheControl: CACHE_NONE });
+  return htmlResponse(renderHome(deps.render, state, plan), { status, cacheControl: CACHE_NONE });
 }
 
 export function createContactHandler(deps: ContactDeps): Handler {
@@ -111,7 +119,7 @@ export function createContactHandler(deps: ContactDeps): Handler {
         message: "Some details need another look before I can send this.",
         errors: parsed.errors,
         values: echoValues(fields),
-      });
+      }, planOf(fields));
     }
 
     // A filled honeypot is answered exactly like a success: a bot learns
@@ -121,11 +129,9 @@ export function createContactHandler(deps: ContactDeps): Handler {
       return answer(deps, context, 200, { status: "sent", message: SENT_MESSAGE });
     }
 
+    const record = toRecord(parsed.message, key, new Date());
     try {
-      await appendToInbox(
-        deps.config.inboxPath,
-        toRecord(parsed.message, key, new Date()),
-      );
+      await saveInquiry(deps.kv, record);
     } catch (error) {
       // The failure detail goes to the log; the visitor gets a sentence and a
       // way to reach me that does not depend on this endpoint working.
@@ -134,10 +140,10 @@ export function createContactHandler(deps: ContactDeps): Handler {
         status: "error",
         message: "I could not store that message. Please email me directly and I will reply.",
         values: echoValues(fields),
-      });
+      }, planOf(fields));
     }
 
-    deps.logger.info("contact.received", { company: parsed.message.company ?? "" });
+    deps.logger.info("contact.received", { kind: record.kind, plan: record.plan ?? "" });
     return answer(deps, context, 200, { status: "sent", message: SENT_MESSAGE });
   };
 }

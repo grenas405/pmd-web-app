@@ -21,11 +21,11 @@ export function robotsTxt(origin: string): string {
 
 export function sitemapXml(origin: string, lastModified: Date): string {
   const day = lastModified.toISOString().slice(0, 10);
-  const pages = ["/", "/thank-you"];
+  const pages = ["/", "/pricing", "/thank-you"];
   const entries = pages
     .map((path) => {
       const loc = new URL(path, origin).toString();
-      const priority = path === "/" ? "1.0" : "0.3";
+      const priority = path === "/" ? "1.0" : path === "/pricing" ? "0.8" : "0.3";
       return `  <url><loc>${loc}</loc><lastmod>${day}</lastmod><priority>${priority}</priority></url>`;
     })
     .join("\n");

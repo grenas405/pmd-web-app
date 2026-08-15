@@ -16,6 +16,8 @@ import { site } from "../content/site.ts";
 import { advantage, capabilities, process, translations } from "../content/narrative.ts";
 import { type Project, projects } from "../content/projects.ts";
 import { liveSites } from "../content/live.ts";
+import { faq } from "../content/faq.ts";
+import { headline, plan as pricing, PLAN_ID, type PlanId } from "../content/pricing.ts";
 import {
   session,
   type SessionLine,
@@ -130,6 +132,83 @@ function sessionFigure(): Html {
         standard library and Zod, then deployed by one command.
       </figcaption>
     </figure>
+  `;
+}
+
+/**
+ * The offer, made in the middle of the page where a reader who is still here is
+ * ready to hear a number. It leads with what they get and lets the arithmetic
+ * do the arguing; the comparison and its sources live on /pricing.
+ */
+function pricingPromo(): Html {
+  const money = (amount: number) => `$${amount.toLocaleString("en-US")}`;
+  return html`
+    <section class="section section--promo" id="pricing" aria-labelledby="promo-title">
+      ${sectionLabel("06", "What it costs")}
+      <div class="promo">
+        <div class="promo__body">
+          <h2 class="section__title" id="promo-title">
+            Your own software, at ${headline.multiple} of what it used to cost.
+          </h2>
+          <p class="prose">
+            An Oklahoma City business is typically quoted thousands to get a real website built,
+            and thousands more every year to keep it running. That price is not the software. It is
+            the firm around the software — the account manager, the project manager, the designer,
+            the developer and the person who bills you for all four.
+          </p>
+          <p class="prose">
+            Take the firm away and the number changes completely. ${money(pricing.build)} builds
+            and launches your site. ${money(pricing.care)} a month keeps it fast, patched, backed
+            up and current — and your domain is managed free for the first year. That is
+            <strong>${money(pricing.firstYear)} for your entire first year</strong>, from one
+            engineer who answers his own phone.
+          </p>
+          <div class="promo__actions">
+            <a class="button button--solid" href="/pricing">See the full pricing ${arrowSvg()}</a>
+            <a class="button button--ghost" href="/?plan=${PLAN_ID}#contact">Start a project</a>
+          </div>
+        </div>
+
+        <dl class="promo__figures">
+          <div class="promo__figure">
+            <dt>${money(pricing.build)}</dt>
+            <dd>to design, build and launch — one time</dd>
+          </div>
+          <div class="promo__figure">
+            <dt>${money(pricing.care)}<span class="promo__per">/mo</span></dt>
+            <dd>care, support, hosting and small changes</dd>
+          </div>
+          <div class="promo__figure">
+            <dt>Included</dt>
+            <dd>your domain, registered and managed for year one</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+  `;
+}
+
+/**
+ * The questions that otherwise arrive as a text message at 9pm. Rendered from
+ * the same data that becomes FAQPage structured data in site.ts, so an answer
+ * cannot be improved on the page and left stale in search results.
+ */
+function faqSection(): Html {
+  return html`
+    <section class="section section--faq" id="faq" aria-labelledby="faq-title">
+      ${sectionLabel("08", "Common questions")}
+      <h2 class="section__title" id="faq-title">The things people ask before they text.</h2>
+      <dl class="faq">
+        ${faq.map((entry) =>
+          html`
+            <div class="faq__item">
+              <dt class="faq__question">${entry.question}</dt>
+              <dd class="faq__answer">${entry.answer}</dd>
+            </div>
+          `
+        )}
+      </dl>
+    </section>
   `;
 }
 
@@ -353,7 +432,7 @@ function workSection(): Html {
 function processSection(): Html {
   return html`
     <section class="section section--process" id="process" aria-labelledby="process-title">
-      ${sectionLabel("06", "Working together")}
+      ${sectionLabel("07", "Working together")}
       <h2 class="section__title" id="process-title">Four steps, no discovery-phase invoice.</h2>
       <ol class="steps">
         ${process.map((step) =>
@@ -387,13 +466,13 @@ function errorAttrs(errors: Errors, field: string): Html {
   return raw(`aria-invalid="true" aria-describedby="${field}-error"`);
 }
 
-function contactSection(state: ContactFormState): Html {
+function contactSection(state: ContactFormState, plan?: PlanId): Html {
   const values = state.values ?? {};
   const errors = state.errors;
 
   return html`
     <section class="section section--contact" id="contact" aria-labelledby="contact-title">
-      ${sectionLabel("07", "Start here")}
+      ${sectionLabel("09", "Start here")}
       <div class="contact__grid">
         <div class="contact__intro">
           <h2 class="section__title" id="contact-title">
@@ -405,6 +484,11 @@ function contactSection(state: ContactFormState): Html {
             I will tell you honestly whether software is the answer.
           </p>
           <ul class="contact__direct">
+            <li>
+              <span class="contact__direct-label">Text</span>
+              <a href="${site.phoneHref}">${site.phone}</a>
+              <span class="contact__direct-note">${site.phoneNote}</span>
+            </li>
             <li>
               <span class="contact__direct-label">Email</span>
               <a href="mailto:${site.email}">${site.email}</a>
@@ -430,6 +514,7 @@ function contactSection(state: ContactFormState): Html {
           data-fallback-email="${site.email}"
           novalidate
         >
+          ${plan === undefined ? html`` : html`<input type="hidden" name="plan" value="${plan}" />`}
           <p
             class="form__status form__status--${state.status}"
             role="status"
@@ -526,7 +611,11 @@ export const homeMeta: PageMeta = {
 };
 
 /** Render the whole page. `state` reflects a non-JavaScript form submission. */
-export function renderHome(context: RenderContext, state: ContactFormState): Html {
+export function renderHome(
+  context: RenderContext,
+  state: ContactFormState,
+  plan?: PlanId,
+): Html {
   const main = html`
     ${hero()}
     ${thesis()}
@@ -534,8 +623,10 @@ export function renderHome(context: RenderContext, state: ContactFormState): Htm
     ${approachSection()}
     ${advantageSection()}
     ${workSection()}
+    ${pricingPromo()}
     ${processSection()}
-    ${contactSection(state)}
+    ${faqSection()}
+    ${contactSection(state, plan)}
   `;
   return layout(context, homeMeta, main);
 }

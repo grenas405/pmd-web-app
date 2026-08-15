@@ -172,6 +172,7 @@ function footer(context: RenderContext): Html {
           One paradigm shift in web development — built in ${site.locality}.
         </p>
         <ul class="footer__links">
+          <li><a href="${site.phoneHref}">${site.phone}</a> <span>(${site.phoneNote})</span></li>
           <li><a href="mailto:${site.email}">${site.email}</a></li>
           <li>
             <a href="${site.github}" rel="me noopener noreferrer" target="_blank">GitHub</a>

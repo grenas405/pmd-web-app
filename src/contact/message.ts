@@ -41,6 +41,16 @@ export const ContactSchema = z.object({
       .min(20, "A sentence or two about the problem helps — 20 characters minimum.")
       .max(4000, "Please keep it under 4000 characters; we can go deeper by email."),
   ),
+  /**
+   * The plan the visitor was reading about, carried from the pricing page as a
+   * hidden field. A literal rather than free text: this value is written
+   * straight into storage and shown back to the operator.
+   *
+   * `.catch` rather than a plain optional, because the visitor cannot see or
+   * correct this field — a tampered or stale value should be quietly dropped,
+   * never turned into a validation error they are asked to fix.
+   */
+  plan: z.literal("launch-295").optional().catch(undefined),
   /** Bot trap: a field hidden from people and irresistible to form fillers. */
   website: z.string().max(200).optional(),
 });
