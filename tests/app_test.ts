@@ -5,6 +5,8 @@
  */
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { liveSites } from "../src/content/live.ts";
+import { session, sessionSummary } from "../src/content/session.ts";
 import { createApp } from "../src/app.ts";
 import { parseConfig } from "../src/config.ts";
 import { silentLogger } from "../src/log.ts";
@@ -62,6 +64,33 @@ Deno.test("the front page renders with the full security header set", async () =
   const body = await response.text();
   assertStringIncludes(body, "One&nbsp;Person.");
   assertStringIncludes(body, "One&nbsp;Paradigm&nbsp;Shift.");
+});
+
+Deno.test("the hero session is served finished, not assembled by script", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  // Every line, in the HTML, before any JavaScript runs. session.js only
+  // re-plays what is already here, so losing this would leave visitors
+  // without JavaScript looking at an empty terminal.
+  for (const line of session) {
+    assertStringIncludes(body, line.text);
+  }
+  assertStringIncludes(body, sessionSummary);
+
+  // And it says it is an illustration rather than a recording.
+  assertStringIncludes(body, "A session, condensed");
+});
+
+Deno.test("every live site on the roster is linked by name and host", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  for (const entry of liveSites) {
+    assertStringIncludes(body, entry.name);
+    assertStringIncludes(body, `https://${entry.host}`);
+  }
+  assertStringIncludes(body, `${liveSites.length} sites`);
 });
 
 Deno.test("an unknown path answers 404 with a page, not a stack trace", async () => {

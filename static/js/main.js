@@ -10,6 +10,7 @@ import { initNav } from "./nav.js";
 import { initTypewriter } from "./typewriter.js";
 import { initReveal } from "./reveal.js";
 import { initContactForm } from "./contact.js";
+import { initSession } from "./session.js";
 
 function attempt(name, start) {
   try {
@@ -23,6 +24,9 @@ attempt("navigation", initNav);
 attempt("typewriter", initTypewriter);
 attempt("reveal", initReveal);
 attempt("contact form", initContactForm);
+// Cheap to start: it waits for the figure to be on screen before it imports
+// Anime.js, so nothing heavy happens here.
+attempt("session", initSession);
 
 // The night sky is the heaviest enhancement and the least important, so it is
 // loaded on its own, after everything else, and only when it will be used.

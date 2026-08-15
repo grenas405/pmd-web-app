@@ -1,0 +1,58 @@
+/**
+ * content_test.ts — the content modules are data, so they get data's tests:
+ * shape, not prose. Nothing here asserts what the copy says, only that an edit
+ * cannot leave the page rendering a blank row or a broken link.
+ */
+
+import { assert, assertEquals } from "@std/assert";
+import { liveSites } from "../src/content/live.ts";
+import { session, sessionPath, sessionSummary } from "../src/content/session.ts";
+
+const KINDS = new Set(["prompt", "tool", "output", "summary"]);
+const TOOLS = new Set(["Read", "Write", "Bash"]);
+
+Deno.test("every session line is renderable", () => {
+  assert(session.length > 0, "the hero would render an empty terminal");
+
+  for (const line of session) {
+    assert(KINDS.has(line.kind), `unknown kind: ${line.kind}`);
+    assert(line.text.trim().length > 0, "a line with no text renders as a blank row");
+    if (line.tool !== undefined) {
+      assert(TOOLS.has(line.tool), `unknown tool: ${line.tool}`);
+      assertEquals(line.kind, "tool", "only a tool line may carry a tool name");
+    }
+  }
+});
+
+Deno.test("the session opens with a prompt and closes with a summary", () => {
+  // The animation types the first line and flourishes the last; both assume
+  // this order, and neither would fail loudly if it changed.
+  assertEquals(session[0]?.kind, "prompt");
+  assertEquals(session[session.length - 1]?.kind, "summary");
+
+  const prompts = session.filter((line) => line.kind === "prompt");
+  assertEquals(prompts.length, 1, "session.js types exactly one prompt");
+});
+
+Deno.test("the session has a spoken alternative and a path", () => {
+  assert(sessionSummary.trim().length > 0, "screen readers would hear nothing");
+  assert(sessionPath.trim().length > 0);
+});
+
+Deno.test("live sites are unique, hostname-shaped and scheme-free", () => {
+  assert(liveSites.length > 0);
+
+  const hosts = new Set<string>();
+  for (const entry of liveSites) {
+    assert(entry.name.trim().length > 0);
+    assert(entry.sector.trim().length > 0);
+
+    // The template writes `https://${host}`, so a scheme here would produce
+    // https://https://example.com and a link that goes nowhere.
+    assert(!entry.host.includes("://"), `${entry.host} must not carry a scheme`);
+    assert(/^[a-z0-9.-]+\.[a-z]{2,}$/.test(entry.host), `${entry.host} is not a hostname`);
+
+    assert(!hosts.has(entry.host), `${entry.host} is listed twice`);
+    hosts.add(entry.host);
+  }
+});

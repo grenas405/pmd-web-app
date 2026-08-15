@@ -109,8 +109,8 @@ server {
 
     # Per-site logs. The fail2ban jail matches /var/log/nginx/*access.log, so
     # the name of this file is what puts this site inside the jail.
-    access_log /var/log/nginx/pedromdominguez.access.log;
-    error_log  /var/log/nginx/pedromdominguez.error.log warn;
+    access_log /var/log/nginx/pedromdominguez-dev.access.log;
+    error_log  /var/log/nginx/pedromdominguez-dev.error.log warn;
 
     location = /api/contact {
         limit_req zone=pmd_contact burst=5 nodelay;

@@ -4,10 +4,14 @@
  * Each section of the site answers one question. Keeping the answers here as
  * plain arrays means the page renderer stays a layout concern and the copy
  * stays an editorial one.
+ *
+ * The audience is a business owner, not an engineer. Every `decision` below is
+ * written the way it would be said across a counter; the engineering that
+ * backs it up is in the source, one click away, for the reader who wants it.
  */
 
 export interface Translation {
-  /** The engineering decision. */
+  /** The decision, in the words a customer would use. */
   readonly decision: string;
   /** What it means for a business that has to live with the software. */
   readonly consequence: string;
@@ -25,74 +29,73 @@ export interface Step {
   readonly duration: string;
 }
 
-/** "Why does this architecture matter to businesses?" */
+/** "Why does any of this matter to my business?" */
 export const translations: readonly Translation[] = [
   {
-    decision: "Simple architecture",
+    decision: "Built small on purpose",
     consequence:
-      "Software you can still change in year three. A system small enough to hold in your head " +
-      "is a system that can be fixed the day it breaks, by whoever is holding it.",
+      "Software you can still change in year three. A system small enough to hold in one head " +
+      "is a system that gets fixed the day it breaks, instead of the quarter it breaks.",
   },
   {
-    decision: "Local-first design",
+    decision: "Keeps working when the internet does not",
     consequence:
-      "Work continues when the connection does not. Trucks in rural Oklahoma, a shop with flaky " +
-      "wifi, an office during an outage — the application keeps taking input and reconciles later.",
+      "Trucks in rural Oklahoma, a shop with bad wifi, an office in an outage. The app keeps " +
+      "taking information and catches up on its own once the signal comes back.",
   },
   {
-    decision: "Minimal dependencies",
+    decision: "Almost nothing borrowed from strangers",
     consequence:
-      "A smaller attack surface and less debt. Every package you do not install is a supply " +
-      "chain you do not have to audit and an upgrade you never have to schedule.",
+      "Most web software is assembled from hundreds of packages written by people nobody has " +
+      "met. Each one is a way in and a thing to update. Yours has a handful, chosen on purpose.",
   },
   {
-    decision: "Explicit permissions",
+    decision: "Locked down by default",
     consequence:
-      "The server can only do what it was granted. Deno starts with no access to your disk, " +
-      "network or environment; each capability is written down where it can be reviewed.",
+      "The server starts with permission to do nothing — not to read your files, not to reach " +
+      "the internet — and gets back only what the job needs, written down where it can be read.",
   },
   {
-    decision: "AI-augmented delivery",
+    decision: "AI does the typing. I do the judgment.",
     consequence:
-      "Agency-level pace with one phone number. Review, refactoring and test scaffolding move " +
-      "quickly — while the person who wrote your system is the person who answers the call.",
+      "Claude Code and Codex handle the mechanical half — scaffolding, tests, the tedious " +
+      "refactor — so one engineer moves at the speed of a team. What to build, and whether it " +
+      "is right, stays a human decision and stays mine.",
   },
   {
-    decision: "Standards, not frameworks",
+    decision: "Nothing to migrate off later",
     consequence:
-      "Nothing to migrate off later. Requests, responses, URLs and forms are Web Platform " +
-      "primitives, so your software does not expire alongside a framework's release cycle.",
+      "No framework to be abandoned in three years and no rebuild to pay for when it is. This " +
+      "is built on the web itself, which has never had a breaking release.",
   },
 ];
 
-/** "Who is Pedro / what does he build?" */
+/** "What can he actually do for me?" */
 export const capabilities: readonly Capability[] = [
   {
-    title: "Line-of-business applications",
-    body: "Scheduling, intake, dispatch, inventory, invoicing — the internal software a company " +
-      "actually runs on, built around how the work is really done rather than how a product " +
-      "category thinks it should be.",
+    title: "Websites that bring in work",
+    body: "A site that loads instantly on a phone in a parking lot, says what you do, and makes " +
+      "it easy to call you. Fast because it is small — not because it was optimised afterwards.",
   },
   {
-    title: "Systems that survive bad networks",
-    body: "Field tools that stay usable at the edge of coverage, capture work locally, and " +
-      "reconcile cleanly. The device is treated as authoritative; the server reconciles.",
+    title: "Quotes, bookings and intake",
+    body: "The form that turns a visitor into a job on your calendar, wired to your inbox and " +
+      "checked hard enough that spam and half-filled requests never reach you.",
   },
   {
-    title: "Security as architecture",
-    body:
-      "Validation at the boundary, strict Content-Security-Policy, least-privilege processes, " +
-      "safe error handling. OWASP guidance shapes the design instead of arriving as a punch " +
-      "list after launch.",
+    title: "The software you run the business on",
+    body: "Scheduling, dispatch, inventory, invoicing — built around how the work is really " +
+      "done, including the paper and the whiteboard and the spreadsheet everyone maintains.",
   },
   {
-    title: "Deployment and stewardship",
-    body: "Ubuntu LTS, Nginx, systemd, backups you can verify. Software delivered as a running " +
-      "service on infrastructure you own, documented well enough that you are never captive.",
+    title: "Hosting, on infrastructure you choose",
+    body: "A Contabo VPS, Deno Deploy, or a server already in your name — the same software " +
+      "runs on any of them. You own the accounts, you hold the source, and you are never " +
+      "captive to me. Backups, certificates and updates are handled.",
   },
 ];
 
-/** "How can an Oklahoma City business work with him?" */
+/** "How would working together actually go?" */
 export const process: readonly Step[] = [
   {
     index: "01",
@@ -104,49 +107,49 @@ export const process: readonly Step[] = [
   },
   {
     index: "02",
-    title: "Smallest useful system",
+    title: "The smallest useful thing",
     duration: "Week 1",
-    body:
-      "A written proposal for the smallest thing that removes the biggest daily friction, with " +
-      "a fixed price and a date. Not a platform. The part that pays for itself first.",
+    body: "A written proposal for the one change that removes the biggest daily friction, with a " +
+      "fixed price and a date. Not a platform. The part that pays for itself first.",
   },
   {
     index: "03",
-    title: "Build in the open",
+    title: "Watch it get built",
     duration: "Weeks 2–5",
     body:
-      "Working software on a staging URL from the first week, updated continuously. You use it " +
-      "while it is being built, and course corrections happen while they are still cheap.",
+      "Working software at a real web address from the first week, updated as it goes. You use " +
+      "it while it is being built, so corrections happen while they are still cheap.",
   },
   {
     index: "04",
-    title: "Deploy and hand over the keys",
+    title: "Launch, and hand over the keys",
     duration: "Launch",
-    body: "Deployed to infrastructure in your name, with documentation, backups and the source. " +
-      "Ongoing support is a choice you keep making, not a lock-in you signed.",
+    body: "Live on hosting in your name, with the source, the documentation and the backups. " +
+      "Ongoing support is a choice you keep making, not a contract you signed once.",
   },
 ];
 
-/** "How can one developer compete with an agency?" — headline comparisons. */
+/** "Why one person instead of an agency?" */
 export const advantage: readonly Translation[] = [
   {
-    decision: "No handoff loss",
+    decision: "One person, several businesses",
     consequence:
-      "The person in your discovery meeting is the person writing the code and the person " +
-      "answering at 7pm when something looks wrong. Nothing is lost between an account " +
-      "manager, a designer, an offshore team and a maintenance contract.",
+      "The sites listed below run day and night on one small server, maintained by one engineer. " +
+      "That is only possible because each one is small, boring and built the same way — and it " +
+      "is why a project here does not carry the overhead of a firm.",
   },
   {
-    decision: "No stack tax",
+    decision: "Nothing lost in the handoff",
     consequence:
-      "An agency's estimate carries the weight of its standard stack — the build pipeline, the " +
-      "framework upgrade, the dependency audit. A small architecture removes that line item " +
-      "from the bid and from every year that follows.",
+      "The person in your first meeting is the person writing the code and the person answering " +
+      "at 7pm when something looks wrong. No account manager, no offshore team, no ticket queue " +
+      "between you and the person who can fix it.",
   },
   {
-    decision: "Iteration at machine speed",
+    decision: "You are not paying for the machinery",
     consequence:
-      "AI-assisted development compresses the mechanical parts of the work: scaffolding, tests, " +
-      "refactors, review passes. Judgment stays human; typing stops being the bottleneck.",
+      "An agency's price carries its standard toolkit — the build pipeline, the yearly framework " +
+      "upgrade, the security audit of code nobody there wrote. Take that away and the same " +
+      "working software costs less to build and far less to keep.",
   },
 ];

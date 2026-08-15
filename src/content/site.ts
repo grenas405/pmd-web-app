@@ -16,21 +16,25 @@ export const site = {
   domain: "pedromdominguez.dev",
   tagline: "One Person. One Paradigm Shift.",
   description:
-    "Pedro M. Dominguez builds secure, local-first software for Oklahoma City businesses — " +
-    "small architectures, minimal dependencies, and AI-augmented delivery at agency speed.",
+    "Pedro M. Dominguez builds and looks after websites and business software for Oklahoma City " +
+    "companies. One engineer, working with AI, at a pace that used to take a whole agency.",
   email: "pedro.dfedro@gmail.com",
   github: "https://github.com/grenas405",
   locality: "Oklahoma City",
   region: "OK",
   regionName: "Oklahoma",
   country: "US",
-  /** Rotated through by the hero typewriter. Short phrases read best. */
+  /**
+   * Rotated through by the hero typewriter. Short phrases read best, and each
+   * one names something a business owner would recognise wanting — not a
+   * technology they would have to look up.
+   */
   disciplines: [
-    "Web Development",
-    "Local-First Software",
-    "Business Software",
-    "AI-Augmented Engineering",
-    "Secure Systems",
+    "Business Websites",
+    "Quote & Booking Forms",
+    "Customer Portals",
+    "Software That Works Offline",
+    "Someone Who Answers",
   ],
 } as const;
 
@@ -69,12 +73,14 @@ export function structuredData(origin: string): string {
           addressRegion: site.region,
           addressCountry: site.country,
         },
+        // Phrased the way someone searches for this work, not the way it is
+        // built. The stack is in the source for anyone who wants it.
         knowsAbout: [
-          "Deno",
-          "TypeScript",
+          "Web design and development",
+          "Small business websites",
+          "Custom business software",
+          "Website hosting and maintenance",
           "Web application security",
-          "Local-first software",
-          "Systems architecture",
         ],
       },
       {

@@ -18,7 +18,7 @@ Requires [Deno](https://deno.com) 2.x. Nothing else — there is no `npm install
 
 ```sh
 deno task dev      # http://127.0.0.1:8002 with file watching
-deno task test     # 81 tests
+deno task test     # 87 tests
 deno task verify   # fmt --check, lint, type check, tests
 ```
 
@@ -52,7 +52,7 @@ touches the environment.
 | `src/render/html.ts`    | The `html` tagged template that escapes by default                          |
 | `src/render/layout.ts`  | Document shell: head, masthead, footer, sky                                 |
 | `src/pages/*.ts`        | Page composition. Pure functions of (context, data)                         |
-| `src/content/*.ts`      | Copy and portfolio entries, as plain data                                   |
+| `src/content/*.ts`      | Copy, portfolio, the hero session and the live-site roster, as plain data   |
 | `src/contact/*.ts`      | Contact schema (pure) and inbox append (the only disk write)                |
 | `static/`               | CSS, ES modules, images, vendored font and Anime.js                         |
 | `systemd/`              | The unit and its optional environment file                                  |
@@ -233,8 +233,10 @@ traffic down, and two of the three are box-wide rather than per site:
 
 The vhost is [nginx/pedromdominguez.dev](nginx/pedromdominguez.dev): TLS, compression, per-site logs
 and connection limits only. It adds no security headers, because those are the application's and two
-copies would drift apart. Its access log is named `/var/log/nginx/pedromdominguez.access.log`, which
-is what puts this site inside the jail's `*access.log` glob.
+copies would drift apart. Its access log is named `/var/log/nginx/pedromdominguez-dev.access.log` —
+`-dev` because portfolio-app's `.com` vhost already owns `pedromdominguez.access.log` on this box,
+and two sites interleaved in one log is nobody's idea of a good afternoon. The `*access.log` glob
+still puts it inside the fail2ban jail.
 
 ```sh
 sudo install -o root -g root -m 0644 nginx/snippets/deny-probes.conf /etc/nginx/snippets/deny-probes.conf
@@ -320,9 +322,22 @@ works:
 - `reveal.js` — fades in sections that are below the fold, and only those
 - `contact.js` — upgrades the real `<form>` to `fetch`; falls back to a normal POST if anything goes
   wrong
+- `session.js` — replays the hero's Claude Code session (the transcript is already in the HTML)
 
-`sky.js` — the gold shooting stars, and the only user of Anime.js — is dynamically imported during
-idle time, and never at all when the visitor prefers reduced motion.
+`sky.js` — the gold shooting stars — is dynamically imported during idle time, and never at all when
+the visitor prefers reduced motion.
+
+Anime.js has exactly two callers, `sky.js` and `session.js`, and neither loads it eagerly: the sky
+waits for idle, and the session waits until the hero terminal is actually on screen. The vendored
+build is 42 KB, which is too much to put in front of a hero that is already readable without it.
+
+The hero session is worth understanding as a pattern, because it is the same contract every
+enhancement here keeps. `src/content/session.ts` holds the transcript as data; `home.ts` renders
+**every line of it, finished**, into the HTML; `session.js` then hides those lines and brings them
+back in order. Turn JavaScript off, prefer reduced motion, or let the module throw, and the visitor
+reads a completed session rather than an empty box. The figure is `aria-hidden` with a one-sentence
+`visually-hidden` summary beside it, so a screen reader hears what happened instead of every typed
+character.
 
 Accessibility and motion: one `<h1>`, no heading-level jumps, labels bound to every input, a skip
 link, visible focus rings, and `prefers-reduced-motion: reduce` honoured by both the CSS and the

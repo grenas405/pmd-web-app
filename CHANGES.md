@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+### The page speaks to business owners
+
+- The hero's One/Zero/OKC figures are replaced by a **Claude Code session** — a request in plain
+  English, two files written, the suite passing, the change deployed — animated with Anime.js in
+  `static/js/session.js`. The transcript lives in `src/content/session.ts` as data and is rendered
+  **complete** into the HTML; the script hides those lines and replays them. No JavaScript, reduced
+  motion, or a thrown error all leave the finished session on screen, which is the same contract
+  `typewriter.js` keeps with the rotating word. The figure is `aria-hidden` beside a one-sentence
+  `visually-hidden` summary, so a screen reader hears what happened rather than every keystroke.
+  Anime.js is imported only once the terminal is actually on screen — 42 KB does not belong in front
+  of a hero that reads fine without it. The caption says the session is condensed, because a
+  transcript that looks captured should either be captured or say that it is not.
+- **`src/content/live.ts`** and a "Running right now" roster at the head of the work section: the
+  four sites currently served from one box, linked by name and host, under the line that makes the
+  point — _N sites · one engineer · one small server_. This is where "one person can run several web
+  apps" stops being an adjective and becomes a number a visitor can click. `denogenesis.com` (502)
+  and `pedromdominguez.com` (parked) were checked and left off.
+- Copy across `site.ts` and `narrative.ts` moves from engineering to consequence: "local-first
+  design" becomes "keeps working when the internet does not", "explicit permissions" becomes "locked
+  down by default", and AI is described as doing the typing while judgment stays human. Hosting
+  appears once, as the client's choice of a Contabo VPS, Deno Deploy, or their own server. Deno, the
+  JSR standard library and Zod stay visible — as file names in the terminal and one line in the
+  caption — without being explained at anyone.
+- The vhost logs to `pedromdominguez-dev.access.log`. It shared `pedromdominguez.access.log` with
+  portfolio-app's `.com` vhost, interleaving two sites in one file; the fail2ban `*access.log` glob
+  still matches.
+
+### Deployment
+
 - Deployment now follows the layout the other Deno sites on this box use: `systemd/`, `nginx/`,
   `fail2ban/` and `scripts/` at the top level, in place of a single `deploy/` directory. The vhost
   is named after the site it serves (`nginx/pedromdominguez.dev`) rather than `nginx.conf`.

@@ -660,34 +660,257 @@ main {
   margin-bottom: clamp(3rem, 7vw, 4.5rem);
 }
 
-.hero__facts {
-  display: grid;
-  gap: 1.5rem;
+/* --------------------------------------------------------------- session - */
+
+/*
+ * The hero terminal. It is served complete and readable; session.js hides the
+ * rows and replays them only once it has decided to. Nothing below assumes the
+ * animation ever runs.
+ */
+
+.session {
+  margin: 0;
   padding-top: 2rem;
   border-top: var(--rule);
+  max-width: 44rem;
 }
 
-.fact dt {
-  font-family: var(--font-display);
-  font-variation-settings: "opsz" 48;
-  font-size: 1.75rem;
-  font-weight: 600;
-  line-height: 1;
-  color: var(--gold);
-  margin-bottom: 0.4rem;
+.session__chrome {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  background: var(--navy-700);
+  border: 1px solid var(--edge);
+  border-bottom: 0;
+  border-radius: 0.5rem 0.5rem 0 0;
 }
 
-.fact dd {
-  margin: 0;
-  max-width: 30ch;
-  font-size: 0.9375rem;
+.session__dots {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--gold-deep);
+  box-shadow: 0.85rem 0 0 var(--navy-600), 1.7rem 0 0 var(--navy-600);
+}
+
+.session__path {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
   color: var(--text-mute);
 }
 
+.session__body {
+  margin: 0;
+  padding: 1rem 0.9rem 1.1rem;
+  list-style: none;
+  background: var(--navy-800);
+  border: 1px solid var(--edge);
+  border-radius: 0 0 0.5rem 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.9;
+  overflow-x: auto;
+}
+
+.session__row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  white-space: nowrap;
+}
+
+.session__marker {
+  flex: none;
+  width: 1ch;
+  color: var(--gold);
+}
+
+.session__tool {
+  flex: none;
+  width: 5ch;
+  color: var(--text-soft);
+}
+
+.session__text {
+  color: var(--text-soft);
+}
+
+.session__detail {
+  color: var(--text-mute);
+}
+
+.session__row--prompt {
+  margin-bottom: 0.6rem;
+}
+
+.session__row--prompt .session__text {
+  color: var(--text);
+}
+
+/* The caret rides the end of the prompt only while it is being typed. */
+.session[data-session-playing] .session__row--prompt .session__text::after {
+  content: "";
+  display: inline-block;
+  width: 0.55ch;
+  height: 1em;
+  margin-left: 0.15ch;
+  vertical-align: text-bottom;
+  background: var(--gold);
+  animation: session-caret 1s steps(2, jump-none) infinite;
+}
+
+.session__row--output .session__marker,
+.session__row--output .session__text {
+  color: var(--gold-bright);
+}
+
+.session__row--summary {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--edge-cool);
+}
+
+.session__row--summary .session__marker {
+  visibility: hidden;
+}
+
+.session__row--summary .session__text {
+  color: var(--text-mute);
+}
+
+.session__caption {
+  margin-top: 0.9rem;
+  max-width: 44ch;
+  font-size: 0.875rem;
+  color: var(--text-mute);
+}
+
+@keyframes session-caret {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
 @media (min-width: 48rem) {
-  .hero__facts {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 2.5rem;
+  .session__body {
+    font-size: 0.875rem;
+    padding: 1.2rem 1.4rem 1.3rem;
+  }
+}
+
+/* ---------------------------------------------------------------- roster - */
+
+.roster {
+  margin-bottom: clamp(2.5rem, 6vw, 3.5rem);
+  padding: 1.4rem clamp(1.1rem, 3vw, 1.8rem) 1.5rem;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 0.75rem;
+}
+
+.roster__heading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.1rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+.roster__pulse {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 0 var(--edge-strong);
+  animation: roster-pulse 2.6s ease-out infinite;
+}
+
+.roster__list {
+  display: grid;
+  gap: 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.roster__item {
+  display: grid;
+  gap: 0.15rem 1rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--edge-cool);
+}
+
+.roster__item:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.roster__link {
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px solid var(--edge-strong);
+  justify-self: start;
+}
+
+.roster__link:hover,
+.roster__link:focus-visible {
+  color: var(--gold-bright);
+}
+
+.roster__sector,
+.roster__host {
+  font-size: 0.875rem;
+  color: var(--text-mute);
+}
+
+.roster__host {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}
+
+.roster__note {
+  margin: 1.2rem 0 0;
+  padding-top: 1rem;
+  border-top: var(--rule);
+  max-width: 52ch;
+  font-size: 0.9375rem;
+  color: var(--text-soft);
+}
+
+@keyframes roster-pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--edge-strong);
+  }
+  70% {
+    box-shadow: 0 0 0 0.6rem rgba(217, 178, 95, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(217, 178, 95, 0);
+  }
+}
+
+@media (min-width: 40rem) {
+  .roster__item {
+    grid-template-columns: minmax(12rem, 1fr) minmax(9rem, auto) minmax(14rem, auto);
+    align-items: baseline;
+  }
+
+  .roster__host {
+    justify-self: end;
   }
 }
 
@@ -1425,6 +1648,12 @@ main {
   .typewriter__caret {
     animation: none;
     opacity: 1;
+  }
+
+  /* The session is served finished, so there is nothing to reveal; session.js
+     returns before it ever sets data-session-playing. */
+  .roster__pulse {
+    animation: none;
   }
 
   [data-reveal] {

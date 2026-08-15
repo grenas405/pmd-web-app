@@ -15,6 +15,8 @@ import { arrowSvg } from "../render/marks.ts";
 import { site } from "../content/site.ts";
 import { advantage, capabilities, process, translations } from "../content/narrative.ts";
 import { type Project, projects } from "../content/projects.ts";
+import { liveSites } from "../content/live.ts";
+import { session, type SessionLine, sessionPath, sessionSummary } from "../content/session.ts";
 import type { ContactFormState } from "../routes/contact_state.ts";
 
 function sectionLabel(index: string, text: string): Html {
@@ -60,21 +62,55 @@ function hero(): Html {
         <a class="button button--ghost" href="#work">See the work</a>
       </div>
 
-      <dl class="hero__facts">
-        <div class="fact">
-          <dt>One</dt>
-          <dd>engineer, from the first conversation through years of maintenance</dd>
-        </div>
-        <div class="fact">
-          <dt>Zero</dt>
-          <dd>client-side frameworks between your customers and your content</dd>
-        </div>
-        <div class="fact">
-          <dt>OKC</dt>
-          <dd>where it is designed, deployed and supported — same time zone, same city</dd>
-        </div>
-      </dl>
+      ${sessionFigure()}
     </section>
+  `;
+}
+
+/**
+ * One transcript line. Pure; the animation only ever re-plays what this emits.
+ * The marker is plain text — `>` is escaped to `&gt;` by the template, so it
+ * needs no `raw()` and cannot become markup.
+ */
+function sessionRow(line: SessionLine): Html {
+  const marker = line.kind === "prompt" ? ">" : line.kind === "output" ? "✓" : "⏺";
+  // The prompt is the one line the animation types out character by character.
+  const typed = line.kind === "prompt" ? raw("data-session-typed") : html``;
+  return html`
+    <li class="session__row session__row--${line.kind}" data-session-row>
+      <span class="session__marker" aria-hidden="true">${marker}</span>
+      ${line.tool === undefined ? html`` : html`<span class="session__tool">${line.tool}</span>`}
+      <span class="session__text" ${typed}>${line.text}</span>
+      ${line.detail === undefined
+        ? html``
+        : html`<span class="session__detail">${line.detail}</span>`}
+    </li>
+  `;
+}
+
+/**
+ * The hero's Claude Code session.
+ *
+ * Every line is rendered here, finished, in the HTML. `session.js` hides them
+ * and replays them; if it never runs — no JavaScript, reduced motion, a thrown
+ * error — the visitor reads the completed session instead of an empty box.
+ */
+function sessionFigure(): Html {
+  return html`
+    <figure class="session" data-session>
+      <div class="session__chrome" aria-hidden="true">
+        <span class="session__dots"></span>
+        <span class="session__path">${sessionPath}</span>
+      </div>
+
+      <ol class="session__body" aria-hidden="true">${session.map(sessionRow)}</ol>
+      <p class="visually-hidden">${sessionSummary}</p>
+
+      <figcaption class="session__caption">
+        A session, condensed — Claude Code and Codex do the typing. Built on Deno with the JSR
+        standard library and Zod, then deployed by one command.
+      </figcaption>
+    </figure>
   `;
 }
 
@@ -247,6 +283,37 @@ function projectCard(project: Project): Html {
   `;
 }
 
+/**
+ * The sites that are up right now. The count is the argument: one engineer
+ * keeping several businesses online is a fact a visitor can check by clicking,
+ * which is worth more than any adjective in the paragraph above it.
+ */
+function liveRoster(): Html {
+  return html`
+    <div class="roster">
+      <p class="roster__heading">
+        <span class="roster__pulse" aria-hidden="true"></span>
+        Running right now
+      </p>
+      <ul class="roster__list">
+        ${liveSites.map((entry) =>
+          html`
+            <li class="roster__item">
+              <a class="roster__link" href="https://${entry.host}" rel="noopener">${entry.name}</a>
+              <span class="roster__sector">${entry.sector}</span>
+              <span class="roster__host">${entry.host}</span>
+            </li>
+          `
+        )}
+      </ul>
+      <p class="roster__note">
+        ${String(liveSites.length)} sites · one engineer · one small server in Oklahoma City. That
+        is only possible because each one is small and built the same way.
+      </p>
+    </div>
+  `;
+}
+
 function workSection(): Html {
   return html`
     <section class="section section--work" id="work" aria-labelledby="work-title">
@@ -258,6 +325,7 @@ function workSection(): Html {
         Not demos. Systems that a shop, a distributor or a contractor depends on during business
         hours — each one small enough to explain in a paragraph and to maintain for years.
       </p>
+      ${liveRoster()}
       <div class="projects">${projects.map(projectCard)}</div>
     </section>
   `;
