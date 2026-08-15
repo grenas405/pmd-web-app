@@ -38,8 +38,13 @@ function hero(): Html {
       </p>
 
       <h1 class="hero__title" id="hero-title">
-        <span class="hero__line">One&nbsp;Person.</span>
-        <span class="hero__line hero__line--accent">One&nbsp;Paradigm&nbsp;Shift.</span>
+        <!-- Ordinary spaces, deliberately. Non-breaking ones made each line a
+            single unbreakable token, and at the hero's clamped size that is
+            wider than a phone: the tail of "Shift." fell off the right edge
+            and took the page's horizontal scroll with it. Each line is its
+            own block, so wrapping inside one is fine. -->
+        <span class="hero__line">One Person.</span>
+        <span class="hero__line hero__line--accent">One Paradigm Shift.</span>
       </h1>
 
       <p class="hero__rotator">

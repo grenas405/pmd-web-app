@@ -25,6 +25,16 @@
   appears once, as the client's choice of a Contabo VPS, Deno Deploy, or their own server. Deno, the
   JSR standard library and Zod stay visible — as file names in the terminal and one line in the
   caption — without being explained at anyone.
+- Fixed a horizontal scrollbar on phones. The hero title's lines were joined by `&nbsp;`, which made
+  each one a single unbreakable token; at the title's clamped size that is about 430px against a
+  335px content box on a 375px screen, so the tail of "Shift." hung past the right edge and the page
+  scrolled sideways to reach it. Ordinary spaces now, with `text-wrap: balance` so a wrapped line
+  splits evenly rather than stranding a word. A test asserts the non-breaking spaces do not come
+  back.
+- The live-site roster's three-column layout opened at `40rem`, where its combined track minimums
+  (35rem plus gaps) exceeded what the gutter and panel padding leave — a second, narrower source of
+  the same horizontal scroll, between roughly 640px and 768px. It now opens at `48rem` with smaller
+  minimums.
 - The vhost logs to `pedromdominguez-dev.access.log`. It shared `pedromdominguez.access.log` with
   portfolio-app's `.com` vhost, interleaving two sites in one file; the fail2ban `*access.log` glob
   still matches.

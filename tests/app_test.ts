@@ -62,8 +62,19 @@ Deno.test("the front page renders with the full security header set", async () =
   assertEquals(response.headers.get("x-content-type-options"), "nosniff");
 
   const body = await response.text();
-  assertStringIncludes(body, "One&nbsp;Person.");
-  assertStringIncludes(body, "One&nbsp;Paradigm&nbsp;Shift.");
+  assertStringIncludes(body, "One Person.");
+  assertStringIncludes(body, "One Paradigm Shift.");
+});
+
+Deno.test("the hero title can wrap on a narrow screen", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  // A non-breaking space here makes the line one unbreakable token. At the
+  // hero's clamped size that is wider than a phone, so the end of the line
+  // hangs off the right edge and the page scrolls sideways to reach it.
+  assert(!body.includes("One&nbsp;Paradigm"), "the hero title cannot wrap on a narrow screen");
+  assert(!body.includes("One&nbsp;Person"), "the hero title cannot wrap on a narrow screen");
 });
 
 Deno.test("the hero session is served finished, not assembled by script", async () => {

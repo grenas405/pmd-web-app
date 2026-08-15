@@ -585,6 +585,10 @@ main {
   font-size: clamp(2.6rem, 1rem + 9.2vw, 7.5rem);
   line-height: 0.94;
   letter-spacing: -0.035em;
+  /* When a line does have to wrap on a narrow screen, split it evenly rather
+     than leaving one word stranded. Ignored by browsers that lack it, which
+     simply wrap normally. */
+  text-wrap: balance;
 }
 
 .hero__line {
@@ -903,9 +907,16 @@ main {
   }
 }
 
-@media (min-width: 40rem) {
+/*
+ * 48rem, not 40rem: the three tracks have a combined minimum, and a hostname is
+ * one unbreakable monospace token. At 40rem the row wanted more width than the
+ * gutter and the panel padding leave it, and the page picked up a horizontal
+ * scrollbar to cover the difference. The minimums below fit with room to spare
+ * at the width the query now opens at.
+ */
+@media (min-width: 48rem) {
   .roster__item {
-    grid-template-columns: minmax(12rem, 1fr) minmax(9rem, auto) minmax(14rem, auto);
+    grid-template-columns: minmax(8rem, 1fr) minmax(6rem, auto) auto;
     align-items: baseline;
   }
 
