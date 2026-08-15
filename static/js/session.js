@@ -60,6 +60,29 @@ async function type(element, text, stopped) {
   }
 }
 
+/**
+ * The other businesses this workflow has been run for, as `[text, detail]` per
+ * row. Anything malformed returns an empty list and the session simply loops
+ * the one the server rendered: a bad attribute must never blank the terminal.
+ */
+function readRotation(figure, rowCount) {
+  try {
+    const parsed = JSON.parse(figure.dataset.sessions ?? "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((entry) =>
+      entry !== null &&
+      typeof entry === "object" &&
+      Array.isArray(entry.rows) &&
+      // The script writes onto rows that already exist. An entry of a
+      // different length would leave half a transcript from one business and
+      // half from another, which is worse than not rotating at all.
+      entry.rows.length === rowCount
+    );
+  } catch {
+    return [];
+  }
+}
+
 export function initSession(root = document) {
   const figure = root.querySelector("[data-session]");
   if (figure === null) return;
@@ -71,10 +94,33 @@ export function initSession(root = document) {
   if (!motionAllowed()) return;
 
   const prompt = figure.querySelector("[data-session-typed]");
-  const promptText = prompt === null ? "" : prompt.textContent;
+  const pathLabel = figure.querySelector("[data-session-path]");
+  const rotation = readRotation(figure, rows.length);
 
   let stopped = false;
+  let index = 0;
   const isStopped = () => stopped;
+
+  /** Write one subject's text onto the rows already in the DOM. */
+  function paint(entry) {
+    if (pathLabel !== null && typeof entry.path === "string") {
+      pathLabel.textContent = entry.path;
+    }
+    rows.forEach((row, i) => {
+      const [text, detail] = entry.rows[i] ?? [];
+      const textNode = row.querySelector(".session__text");
+      const detailNode = row.querySelector(".session__detail");
+      if (textNode !== null && typeof text === "string") textNode.textContent = text;
+      if (detailNode !== null && typeof detail === "string") detailNode.textContent = detail;
+    });
+  }
+
+  // Read after any paint, never cached: the prompt is what gets typed, and it
+  // changes with the subject. `activePrompt` is whatever the currently painted
+  // business asked for, so a failure part-way through typing can restore a
+  // whole sentence rather than half of one.
+  const currentPrompt = () => (prompt === null ? "" : prompt.textContent);
+  let activePrompt = currentPrompt();
 
   async function run() {
     await whenSeen(figure);
@@ -91,12 +137,26 @@ export function initSession(root = document) {
       await whenVisible();
       if (stopped) return;
 
+      // Loop one is what the server rendered; later loops swap in the next
+      // business before anything is hidden, so the measurement below sees the
+      // text that is about to be typed.
+      if (rotation.length > 1 && index > 0) paint(rotation[index % rotation.length]);
+      activePrompt = currentPrompt();
+
+      // The prompt wraps to two or three lines on a phone, and emptying it
+      // would collapse the terminal and then grow it again on every loop.
+      // Measured each time, so it stays right across rotation and resize.
+      if (prompt !== null) {
+        rows[0].style.minHeight = "";
+        rows[0].style.minHeight = `${rows[0].getBoundingClientRect().height}px`;
+      }
+
       for (const row of rows) row.style.opacity = "0";
       if (prompt !== null) prompt.textContent = "";
 
       // The prompt types first, alone: someone asking for something.
       rows[0].style.opacity = "1";
-      if (prompt !== null) await type(prompt, promptText, isStopped);
+      if (prompt !== null) await type(prompt, activePrompt, isStopped);
       if (stopped) return;
 
       // Then the work answers, one line at a time.
@@ -123,15 +183,20 @@ export function initSession(root = document) {
       }).finished;
 
       await wait(HOLD_MS);
+      index += 1;
     }
   }
 
   void run().catch(() => {
-    // Any failure returns the visitor to the finished transcript rather than
-    // leaving half a session on screen.
+    // Any failure returns the visitor to a finished transcript rather than
+    // leaving half a session on screen. Whichever business was last painted is
+    // complete and true, so it is a fine one to be left looking at.
     figure.removeAttribute("data-session-playing");
-    for (const row of rows) row.style.opacity = "";
-    if (prompt !== null) prompt.textContent = promptText;
+    for (const row of rows) {
+      row.style.opacity = "";
+      row.style.minHeight = "";
+    }
+    if (prompt !== null) prompt.textContent = activePrompt;
   });
 
   return () => {

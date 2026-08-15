@@ -6,7 +6,7 @@
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { liveSites } from "../src/content/live.ts";
-import { session, sessionSummary } from "../src/content/session.ts";
+import { session, sessions, sessionSummary } from "../src/content/session.ts";
 import { createApp } from "../src/app.ts";
 import { parseConfig } from "../src/config.ts";
 import { silentLogger } from "../src/log.ts";
@@ -92,6 +92,32 @@ Deno.test("the hero session is served finished, not assembled by script", async 
 
   // And it says it is an illustration rather than a recording.
   assertStringIncludes(body, "A session, condensed");
+});
+
+Deno.test("the rotation reaches the client as data, with one entry per subject", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  // Escaped into an attribute, not an inline script — which is why the CSP can
+  // stay at one hash and no nonce.
+  const match = body.match(/data-sessions="([^"]*)"/);
+  assert(match !== null, "the figure carries no rotation data");
+
+  const decoded = (match[1] ?? "")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&amp;", "&");
+
+  const rotation = JSON.parse(decoded) as ReadonlyArray<{ path: string; rows: unknown[] }>;
+  assertEquals(rotation.length, sessions.length);
+
+  for (const entry of rotation) {
+    // session.js refuses any entry whose length does not match the rendered
+    // rows; if that ever stops holding, the rotation silently stops working.
+    assertEquals(entry.rows.length, session.length, `${entry.path} has the wrong row count`);
+  }
 });
 
 Deno.test("every live site on the roster is linked by name and host", async () => {

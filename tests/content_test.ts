@@ -7,7 +7,13 @@
 import { assert, assertEquals } from "@std/assert";
 import { liveSites } from "../src/content/live.ts";
 import { nav } from "../src/content/site.ts";
-import { session, sessionPath, sessionSummary } from "../src/content/session.ts";
+import {
+  session,
+  sessionPath,
+  sessions,
+  sessionSummary,
+  subjects,
+} from "../src/content/session.ts";
 
 const KINDS = new Set(["prompt", "tool", "output", "summary"]);
 const TOOLS = new Set(["Read", "Write", "Bash"]);
@@ -15,7 +21,7 @@ const TOOLS = new Set(["Read", "Write", "Bash"]);
 Deno.test("every session line is renderable", () => {
   assert(session.length > 0, "the hero would render an empty terminal");
 
-  for (const line of session) {
+  for (const line of sessions.flatMap((entry) => entry.lines)) {
     assert(KINDS.has(line.kind), `unknown kind: ${line.kind}`);
     assert(line.text.trim().length > 0, "a line with no text renders as a blank row");
     if (line.tool !== undefined) {
@@ -25,14 +31,49 @@ Deno.test("every session line is renderable", () => {
   }
 });
 
-Deno.test("the session opens with a prompt and closes with a summary", () => {
+Deno.test("every session opens with a prompt and closes with a summary", () => {
   // The animation types the first line and flourishes the last; both assume
   // this order, and neither would fail loudly if it changed.
-  assertEquals(session[0]?.kind, "prompt");
-  assertEquals(session[session.length - 1]?.kind, "summary");
+  for (const { path, lines } of sessions) {
+    assertEquals(lines[0]?.kind, "prompt", `${path} does not open with a prompt`);
+    assertEquals(lines[lines.length - 1]?.kind, "summary", `${path} does not close with a summary`);
 
-  const prompts = session.filter((line) => line.kind === "prompt");
-  assertEquals(prompts.length, 1, "session.js types exactly one prompt");
+    const prompts = lines.filter((line) => line.kind === "prompt");
+    assertEquals(prompts.length, 1, `${path}: session.js types exactly one prompt`);
+  }
+});
+
+Deno.test("every session has the same shape as the one the server renders", () => {
+  // session.js writes text onto the rows already in the DOM rather than
+  // rebuilding the list, so a subject with a different row count — or a
+  // different tool on row four — would blend half of one business with half of
+  // another. sessionFor() makes that impossible; this makes it stay impossible.
+  assert(sessions.length > 1, "there is nothing to rotate through");
+
+  for (const { path, lines } of sessions) {
+    assertEquals(lines.length, session.length, `${path} has a different number of rows`);
+    lines.forEach((line, i) => {
+      assertEquals(line.kind, session[i]?.kind, `${path} row ${i} has a different kind`);
+      assertEquals(line.tool, session[i]?.tool, `${path} row ${i} has a different tool`);
+    });
+  }
+});
+
+Deno.test("the hero only names businesses that are actually live", () => {
+  // The roster below the hero is checkable, which is the entire reason it is
+  // worth anything. A subject whose host is not on that roster would be a
+  // claim a visitor could disprove in one click.
+  const hosts = new Set(liveSites.map((entry) => entry.host));
+
+  for (const subject of subjects) {
+    assert(
+      hosts.has(subject.host),
+      `${subject.business} deploys to ${subject.host}, which is not in live.ts`,
+    );
+    assert(subject.business.trim().length > 0);
+    assert(subject.path.startsWith("~/"), `${subject.path} is not a home-relative path`);
+    assert(subject.tests > 0);
+  }
 });
 
 Deno.test("the session has a spoken alternative and a path", () => {

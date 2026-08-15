@@ -16,7 +16,13 @@ import { site } from "../content/site.ts";
 import { advantage, capabilities, process, translations } from "../content/narrative.ts";
 import { type Project, projects } from "../content/projects.ts";
 import { liveSites } from "../content/live.ts";
-import { session, type SessionLine, sessionPath, sessionSummary } from "../content/session.ts";
+import {
+  session,
+  type SessionLine,
+  sessionPath,
+  sessions,
+  sessionSummary,
+} from "../content/session.ts";
 import type { ContactFormState } from "../routes/contact_state.ts";
 
 function sectionLabel(index: string, text: string): Html {
@@ -101,11 +107,19 @@ function sessionRow(line: SessionLine): Html {
  * error — the visitor reads the completed session instead of an empty box.
  */
 function sessionFigure(): Html {
+  // Only what differs between subjects: the title bar, and a [text, detail]
+  // pair per row. The script zips these onto the rows already in the DOM, so
+  // the payload stays small and the markup stays the single source of shape.
+  const rotation = sessions.map((entry) => ({
+    path: entry.path,
+    rows: entry.lines.map((line) => [line.text, line.detail ?? null]),
+  }));
+
   return html`
-    <figure class="session" data-session>
+    <figure class="session" data-session data-sessions="${JSON.stringify(rotation)}">
       <div class="session__chrome" aria-hidden="true">
         <span class="session__dots"></span>
-        <span class="session__path">${sessionPath}</span>
+        <span class="session__path" data-session-path>${sessionPath}</span>
       </div>
 
       <ol class="session__body" aria-hidden="true">${session.map(sessionRow)}</ol>

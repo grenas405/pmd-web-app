@@ -989,6 +989,10 @@ main {
 }
 
 .session__row--prompt {
+  /* The prompt is a sentence, not a command: it wraps rather than scrolling
+     off the side of a phone the way the `deno add` line legitimately does. */
+  white-space: normal;
+  align-items: flex-start;
   margin-bottom: 0.6rem;
 }
 

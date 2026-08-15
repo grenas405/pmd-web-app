@@ -32,6 +32,29 @@
 
 ### The page speaks to business owners
 
+- The hero session now shows the work that is actually for sale. It was a small feature being added
+  to an existing site — _"add a quote request form"_, four files, six minutes. It is now the whole
+  job: _"implement a Deno web app for Heavenly Roofing LLC in Oklahoma City, Oklahoma using
+  @std/http and Zod"_, followed by `deno add jsr:@std/http jsr:@zod/zod`, three files written,
+  `deno task verify` green, and `sudo scripts/deploy.sh` putting it on a live address.
+- And it rotates. `src/content/session.ts` is now one template, `sessionFor()`, applied to three
+  subjects; each loop retypes the prompt for the next business. The same prompt and the same five
+  steps building a site for a roofer, a church and a technology firm is the page's whole argument,
+  made visible in the first screen instead of asserted in a paragraph below it.
+- Every business named is one whose site is actually live, and a test refuses any subject whose host
+  is missing from the roster in `live.ts`. An invented client would not just be one unverifiable
+  claim — a visitor who checks it and finds nothing has learned that this page's evidence does not
+  survive checking, and they would not stop at the invented one.
+- The closing line reads `6 files · tests green · live` rather than counting minutes. Speed reads as
+  competence to an engineer and as _cheap_ to someone deciding what to pay; the same fact framed as
+  what the client received does not invite that question.
+- The rotation reaches the browser as an escaped `data-sessions` attribute — the trick the hero
+  typewriter already uses for its words — so the Content-Security-Policy still needs no nonce.
+  `session.js` refuses any entry whose row count does not match the DOM and keeps looping the
+  rendered session instead, because a malformed attribute must never blank the terminal. The prompt
+  row now wraps (it is a sentence, not a command) and its height is measured and pinned before each
+  loop, so the terminal does not collapse and grow as the text is typed.
+
 - The hero's One/Zero/OKC figures are replaced by a **Claude Code session** — a request in plain
   English, two files written, the suite passing, the change deployed — animated with Anime.js in
   `static/js/session.js`. The transcript lives in `src/content/session.ts` as data and is rendered

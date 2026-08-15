@@ -325,7 +325,8 @@ works:
 - `reveal.js` — fades in sections that are below the fold, and only those
 - `contact.js` — upgrades the real `<form>` to `fetch`; falls back to a normal POST if anything goes
   wrong
-- `session.js` — replays the hero's Claude Code session (the transcript is already in the HTML)
+- `session.js` — replays the hero's Claude Code session, rotating through three clients (the first
+  transcript is already in the HTML)
 
 `sky.js` — the gold shooting stars — is dynamically imported during idle time, and never at all when
 the visitor prefers reduced motion.
@@ -349,6 +350,19 @@ back in order. Turn JavaScript off, prefer reduced motion, or let the module thr
 reads a completed session rather than an empty box. The figure is `aria-hidden` with a one-sentence
 `visually-hidden` summary beside it, so a screen reader hears what happened instead of every typed
 character.
+
+It rotates. `session.ts` is one workflow — `sessionFor()` — applied to three real businesses, and
+each loop retypes the prompt for the next one. That is the page's argument in miniature: the same
+prompt, the same five steps and the same deploy command produce a web app for a roofer, a church or
+a technology firm, which is the only reason one engineer can keep several of them running.
+
+Two constraints hold it together, both enforced by tests. Every subject must produce **the same rows
+in the same order** — only the text differs — because the script writes onto the rows already in the
+DOM rather than rebuilding the list, and a mismatched entry would blend half of one business with
+half of another. And every host the hero names must appear in `live.ts`, because the roster below it
+is checkable and a claim a visitor can disprove in one click is worse than no claim at all. The
+other subjects reach the browser as an escaped `data-sessions` attribute, the same trick the hero
+typewriter uses for its words, so the Content-Security-Policy still needs no nonce.
 
 Accessibility and motion: one `<h1>`, no heading-level jumps, labels bound to every input, a skip
 link, visible focus rings, and `prefers-reduced-motion: reduce` honoured by both the CSS and the
