@@ -6,6 +6,7 @@
 
 import { assert, assertEquals } from "@std/assert";
 import { liveSites } from "../src/content/live.ts";
+import { nav } from "../src/content/site.ts";
 import { session, sessionPath, sessionSummary } from "../src/content/session.ts";
 
 const KINDS = new Set(["prompt", "tool", "output", "summary"]);
@@ -37,6 +38,22 @@ Deno.test("the session opens with a prompt and closes with a summary", () => {
 Deno.test("the session has a spoken alternative and a path", () => {
   assert(sessionSummary.trim().length > 0, "screen readers would hear nothing");
   assert(sessionPath.trim().length > 0);
+});
+
+Deno.test("every nav entry can fill a row of the menu", () => {
+  assert(nav.length > 0);
+
+  const indexes = new Set<string>();
+  for (const link of nav) {
+    assert(link.label.trim().length > 0);
+    // The menu renders both of these; a blank one leaves a gap in the grid.
+    assert(link.description.trim().length > 0, `${link.label} has no description`);
+    assert(/^\d{2}$/.test(link.index), `${link.label} index is not zero-padded: ${link.index}`);
+
+    assert(link.href.startsWith("#"), `${link.href} is not an in-page anchor`);
+    assert(!indexes.has(link.index), `index ${link.index} is used twice`);
+    indexes.add(link.index);
+  }
 });
 
 Deno.test("live sites are unique, hostname-shaped and scheme-free", () => {

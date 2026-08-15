@@ -11,7 +11,8 @@ import { createApp } from "../src/app.ts";
 import { parseConfig } from "../src/config.ts";
 import { silentLogger } from "../src/log.ts";
 import { scriptHash } from "../src/http/security.ts";
-import { jsonLdScriptBody } from "../src/render/layout.ts";
+import { inlineScriptHashes } from "../src/render/layout.ts";
+import { nav } from "../src/content/site.ts";
 import { structuredData } from "../src/content/site.ts";
 
 const ORIGIN = "https://pedromdominguez.dev";
@@ -30,7 +31,7 @@ async function buildApp(overrides: Record<string, string> = {}) {
     config,
     logger: silentLogger,
     render: { origin: config.origin, asset: (path) => `/static${path}`, jsonLd },
-    security: { hsts: config.hsts, scriptHashes: [await scriptHash(jsonLdScriptBody(jsonLd))] },
+    security: { hsts: config.hsts, scriptHashes: await inlineScriptHashes(jsonLd) },
     startedAt: new Date("2026-01-01T00:00:00Z"),
   });
 }
@@ -102,6 +103,50 @@ Deno.test("every live site on the roster is linked by name and host", async () =
     assertStringIncludes(body, `https://${entry.host}`);
   }
   assertStringIncludes(body, `${liveSites.length} sites`);
+});
+
+Deno.test("every inline script in the page is admitted by the policy", async () => {
+  const app = await buildApp();
+  const response = await app(get("/"), "203.0.113.1");
+  const policy = response.headers.get("content-security-policy") ?? "";
+  const body = await response.text();
+
+  // Read the scripts back out of the served HTML rather than trusting the list
+  // that built the header. A future inline script added to layout.ts and not
+  // to inlineScriptHashes() fails here instead of in a browser console.
+  const inline = [...body.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
+    .map((match) => match[1] ?? "");
+  assertEquals(inline.length, 2, "expected the JSON-LD and the enhancement flag");
+
+  for (const script of inline) {
+    assertStringIncludes(policy, await scriptHash(script));
+  }
+});
+
+Deno.test("the enhancement flag runs before the stylesheet", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  // The stylesheet keys the whole navigation off this flag. Arriving after it
+  // would show the no-JS fallback and then snatch it away.
+  const flag = body.indexOf("documentElement.dataset.js");
+  const stylesheet = body.indexOf("/css/site.css");
+  assert(flag > -1, "the enhancement flag is missing");
+  assert(flag < stylesheet, "the flag must be emitted before the stylesheet");
+});
+
+Deno.test("the navigation is in the markup, menu or no menu", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  // Without JavaScript these links are the navigation, so they are rendered
+  // whatever happens — never built by script.
+  for (const link of nav) {
+    assertStringIncludes(body, `href="${link.href}"`);
+    assertStringIncludes(body, link.label);
+    assertStringIncludes(body, link.description);
+    assertStringIncludes(body, `>${link.index}<`);
+  }
 });
 
 Deno.test("an unknown path answers 404 with a page, not a stack trace", async () => {

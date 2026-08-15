@@ -5,7 +5,7 @@ import {
   scriptHash,
   securityHeaders,
 } from "../src/http/security.ts";
-import { jsonLdScriptBody } from "../src/render/layout.ts";
+import { enhancementScriptBody, jsonLdScriptBody } from "../src/render/layout.ts";
 import { structuredData } from "../src/content/site.ts";
 
 const base = { hsts: false, scriptHashes: [] as string[] };
@@ -54,6 +54,23 @@ Deno.test("the JSON-LD hash in the policy matches the script that is emitted", a
   const hash = await scriptHash(jsonLdScriptBody(json));
   assertStringIncludes(contentSecurityPolicy({ ...base, scriptHashes: [hash] }), hash);
   assert(hash.startsWith("'sha256-"));
+});
+
+Deno.test("both inline scripts are admitted by hash, and nothing else is", async () => {
+  const hashes = [
+    await scriptHash(jsonLdScriptBody(structuredData("https://pedromdominguez.dev"))),
+    await scriptHash(enhancementScriptBody()),
+  ];
+  const policy = contentSecurityPolicy({ ...base, scriptHashes: hashes });
+
+  for (const hash of hashes) {
+    assert(hash.startsWith("'sha256-"));
+    assertStringIncludes(policy, hash);
+  }
+
+  // Two hashes are two hashes — not a licence to let any inline script run.
+  assert(!policy.includes("unsafe-inline"), "the policy must never allow inline scripts wholesale");
+  assert(!policy.includes("nonce-"));
 });
 
 Deno.test("state-changing requests require a recognised Origin", () => {

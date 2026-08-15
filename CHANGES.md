@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+### A menu worth opening
+
+- The hamburger now opens a **full-screen menu**: the five sections numbered and set in the display
+  face, each with a line saying what is down there, over a blurred night-sky surface with a scanline
+  and corner brackets. It opens with a diagonal wipe from the toggle's corner, a gold hairline races
+  across, and the items rise in sequence 60ms apart.
+- The wipe is a CSS `clip-path` transition rather than a scripted one — both polygons have four
+  vertices, which is what lets the browser tween them, and Anime.js cannot interpolate `polygon()`
+  and would snap between shapes. Anime.js drives what it is good at: the sweep and the staggered
+  rise, imported on **first open**, so a visitor who never opens the menu never pays for the 42 KB.
+  If that import fails the menu still opens — the same contract `session.js` keeps.
+- While it is open the page behind holds still and goes `inert`, so Tab cannot leave the menu; focus
+  lands on the first item and returns to the button on close. Escape and any link close it, and
+  crossing the 60rem breakpoint closes it rather than stranding the scroll lock.
+- **Fixed: a phone with JavaScript disabled had no navigation at all.** `.masthead__nav` was
+  `display: none` until a script added `[data-open]`, while `nav.js` claimed the links "work without
+  this file". They now do: a one-line inline script in `<head>` marks the document as enhanced, and
+  the stylesheet only hides the links behind a button when that flag is present. Without it the
+  links render as a plain stacked list and the button is not drawn, because a dead button is worse
+  than no button.
+- That flag is the second inline script on the page, admitted by hash like the JSON-LD. Both hashes
+  now come from `inlineScriptHashes()` in `src/render/layout.ts` — the module that emits them —
+  rather than being assembled in `main.ts`, and a test reads every inline script back out of the
+  served HTML to check its hash is in the header. A third one added and forgotten fails the suite.
+  The policy still carries no `unsafe-inline` and no nonce.
+- Desktop is untouched: at 60rem the same markup flattens back into the masthead row it has always
+  been, with the indexes and descriptions hidden.
+
 ### The page speaks to business owners
 
 - The hero's One/Zero/OKC figures are replaced by a **Claude Code session** — a request in plain

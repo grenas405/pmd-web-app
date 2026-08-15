@@ -9,6 +9,7 @@ import { escapeJsonForScript, type Html, html, raw } from "./html.ts";
 import type { RenderContext } from "./context.ts";
 import { absoluteUrl, nav, site } from "../content/site.ts";
 import { markSvg } from "./marks.ts";
+import { scriptHash } from "../http/security.ts";
 
 export interface PageMeta {
   readonly title: string;
@@ -25,6 +26,13 @@ function head(context: RenderContext, meta: PageMeta): Html {
   return html`
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+    <!-- Before the stylesheet, and classic rather than a module, so it runs at
+        parse time: the CSS below keys the navigation's whole presentation off
+        this flag, and a deferred script would show the fallback first and then
+        snatch it away. Admitted by hash; see main.ts. -->
+    <script>${raw(enhancementScriptBody())}</script>
+
     <title>${meta.title}</title>
     <meta name="description" content="${meta.description}" />
     <link rel="canonical" href="${canonical}" />
@@ -72,6 +80,36 @@ export function jsonLdScriptBody(json: string): string {
   return escapeJsonForScript(json);
 }
 
+/**
+ * The exact text of the enhancement flag, for the same reason: `main.ts` hashes
+ * this function's output, and `head()` emits it, so the policy and the page
+ * have one definition between them.
+ *
+ * It says only that JavaScript is running. The stylesheet uses that to decide
+ * whether the navigation is a full-screen menu behind a button, or a plain
+ * stacked list of links — because a menu that needs a script to open is not
+ * navigation at all for a visitor whose script never arrives.
+ */
+export function enhancementScriptBody(): string {
+  return `document.documentElement.dataset.js="";`;
+}
+
+/**
+ * The Content-Security-Policy hashes for every inline script `head()` emits.
+ *
+ * One list, derived from the same functions that produce the markup, so the
+ * policy cannot fall behind the page. `main.ts` builds the server's options
+ * from this and the suite builds its own from it too — a third inline script
+ * added above and forgotten here is a broken page in development, not a
+ * surprise in production.
+ */
+export async function inlineScriptHashes(jsonLd: string): Promise<readonly string[]> {
+  return [
+    await scriptHash(jsonLdScriptBody(jsonLd)),
+    await scriptHash(enhancementScriptBody()),
+  ];
+}
+
 function header(): Html {
   return html`
     <header class="masthead" data-sticky>
@@ -94,13 +132,28 @@ function header(): Html {
         <span class="visually-hidden">Menu</span>
       </button>
 
+      <!-- One nav, two presentations. Below 60rem and with JavaScript running
+          this is the full-screen menu; at 60rem the stylesheet flattens it back
+          into a row and hides the indexes and descriptions. There is no second
+          copy of the links to keep in step with this one. -->
       <nav class="masthead__nav" id="site-nav" aria-label="Sections">
-        <ul>
+        <span class="masthead__nav-sweep" aria-hidden="true" data-nav-sweep></span>
+        <ol class="masthead__nav-list">
           ${nav.map((link) =>
-            html`<li><a href="${link.href}" data-nav-link>${link.label}</a></li>`
+            html`
+              <li class="navitem" data-nav-item>
+                <a class="navitem__link" href="${link.href}" data-nav-link>
+                  <span class="navitem__index" aria-hidden="true">${link.index}</span>
+                  <span class="navitem__label">${link.label}</span>
+                  <span class="navitem__description">${link.description}</span>
+                </a>
+              </li>
+            `
           )}
-        </ul>
-        <a class="button button--ghost masthead__cta" href="#contact">Start a project</a>
+        </ol>
+        <a class="button button--ghost masthead__cta" href="#contact" data-nav-item>
+          Start a project
+        </a>
       </nav>
     </header>
   `;

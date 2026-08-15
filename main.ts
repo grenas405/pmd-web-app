@@ -11,9 +11,9 @@
 import { loadConfig } from "./src/config.ts";
 import { createLogger } from "./src/log.ts";
 import { indexAssets } from "./src/http/assets.ts";
-import { scriptHash, type SecurityOptions } from "./src/http/security.ts";
+import type { SecurityOptions } from "./src/http/security.ts";
 import { createApp } from "./src/app.ts";
-import { jsonLdScriptBody } from "./src/render/layout.ts";
+import { inlineScriptHashes } from "./src/render/layout.ts";
 import { structuredData } from "./src/content/site.ts";
 import type { RenderContext } from "./src/render/context.ts";
 
@@ -25,9 +25,11 @@ export async function start(): Promise<Deno.HttpServer> {
   const assets = await indexAssets(config.staticDir);
 
   const jsonLd = structuredData(config.origin);
+  // The hashes come from the module that emits the scripts, so the policy and
+  // the page cannot drift. Still no 'unsafe-inline' and no nonce.
   const security: SecurityOptions = {
     hsts: config.hsts,
-    scriptHashes: [await scriptHash(jsonLdScriptBody(jsonLd))],
+    scriptHashes: await inlineScriptHashes(jsonLd),
   };
 
   const render: RenderContext = {

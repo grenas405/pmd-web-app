@@ -8,6 +8,13 @@
 export interface NavLink {
   readonly href: string;
   readonly label: string;
+  /**
+   * Zero-padded, in the same style the section labels on the page use. Shown
+   * in the full-screen menu and hidden on desktop, where the nav is a row.
+   */
+  readonly index: string;
+  /** One line saying what is down there. Menu only. */
+  readonly description: string;
 }
 
 export const site = {
@@ -39,11 +46,36 @@ export const site = {
 } as const;
 
 export const nav: readonly NavLink[] = [
-  { href: "#approach", label: "Approach" },
-  { href: "#work", label: "Work" },
-  { href: "#advantage", label: "Advantage" },
-  { href: "#process", label: "Process" },
-  { href: "#contact", label: "Contact" },
+  {
+    href: "#approach",
+    label: "Approach",
+    index: "01",
+    description: "How the work gets done",
+  },
+  {
+    href: "#work",
+    label: "Work",
+    index: "02",
+    description: "Sites running right now",
+  },
+  {
+    href: "#advantage",
+    label: "Advantage",
+    index: "03",
+    description: "Why one person, not a firm",
+  },
+  {
+    href: "#process",
+    label: "Process",
+    index: "04",
+    description: "From counter to launch",
+  },
+  {
+    href: "#contact",
+    label: "Contact",
+    index: "05",
+    description: "Start a project",
+  },
 ];
 
 /** Absolute URL for a site-relative path, for canonical tags and metadata. */

@@ -325,78 +325,320 @@ select {
   transform: translateY(-4px) rotate(-45deg);
 }
 
-.masthead__nav {
-  display: none;
-}
+/*
+ * The navigation has two presentations from one piece of markup.
+ *
+ * Without JavaScript there is no menu to open, so the links are simply there:
+ * a stacked list under the masthead, and no button, because a button that does
+ * nothing is worse than no button at all. The inline script in <head> sets
+ * [data-js] before this stylesheet is applied, and everything below the
+ * fallback is what a visitor with JavaScript gets instead.
+ */
 
-.masthead__nav[data-open] {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  display: block;
-  padding: 1rem var(--gutter) 1.75rem;
-  background: rgba(7, 13, 26, 0.97);
-  border-bottom: 1px solid var(--edge);
-  backdrop-filter: blur(14px);
-}
-
-.masthead__nav ul {
+.masthead__nav-list {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.masthead__nav a {
+.navitem__link {
   display: block;
   padding: 0.65rem 0;
-  font-size: 0.9375rem;
-  letter-spacing: 0.02em;
   text-decoration: none;
   color: var(--text-soft);
   border-bottom: 1px solid var(--edge-cool);
   transition: color 160ms ease;
 }
 
-.masthead__nav a:hover,
-.masthead__nav a[aria-current="true"] {
+.navitem__label {
+  font-size: 0.9375rem;
+  letter-spacing: 0.02em;
+}
+
+.navitem__index,
+.navitem__description {
+  display: none;
+}
+
+.navitem__link:hover,
+.navitem__link:focus-visible,
+.navitem__link[aria-current="true"] {
   color: var(--gold-bright);
+}
+
+.masthead__nav-sweep {
+  display: none;
 }
 
 .masthead__cta {
   margin-top: 1rem;
 }
 
+/* --- the fallback: no script, no button, links visible ------------------- */
+
+.masthead__toggle {
+  display: none;
+}
+
+.masthead__nav {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  padding: 0.5rem var(--gutter) 1.25rem;
+  background: rgba(7, 13, 26, 0.97);
+  border-bottom: 1px solid var(--edge);
+}
+
+/* --- with script: a button, and a full-screen menu behind it ------------- */
+
+[data-js] .masthead__toggle {
+  display: grid;
+}
+
+[data-js] .masthead__nav {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 6rem var(--gutter) 3rem;
+  background: rgba(5, 9, 15, 0.94);
+  backdrop-filter: blur(18px) saturate(140%);
+  border-bottom: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+
+  /*
+   * Closed: collapsed into the toggle's corner. Both polygons have four
+   * vertices, which is what lets the browser tween between them — the wipe is
+   * a CSS transition rather than a scripted one, because Anime.js cannot
+   * interpolate polygon() and would snap. nav.js keeps WIPE_MS in step with
+   * the duration below.
+   *
+   * visibility is what keeps a closed menu out of the tab order: a clipped
+   * element is still focusable. It flips instantly on the way in and waits for
+   * the wipe on the way out.
+   */
+  visibility: hidden;
+  clip-path: polygon(100% 0, 100% 0, 100% 0, 100% 0);
+  transition: clip-path 460ms cubic-bezier(0.22, 0.8, 0.24, 1), visibility 0s linear 460ms;
+}
+
+[data-js] .masthead__nav[data-open] {
+  visibility: visible;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+  transition: clip-path 460ms cubic-bezier(0.22, 0.8, 0.24, 1), visibility 0s;
+}
+
+/* A faint scanline over the whole surface, and brackets at the corners: the
+   HUD register, kept quiet enough to read type through. */
+[data-js] .masthead__nav::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(217, 178, 95, 0.035) 0 1px,
+    transparent 1px 4px
+  );
+}
+
+[data-js] .masthead__nav::after {
+  content: "";
+  position: absolute;
+  inset: 4.75rem 1rem 1.25rem;
+  pointer-events: none;
+  border: 1px solid transparent;
+  border-image: linear-gradient(
+    135deg,
+    var(--edge-strong) 0 2rem,
+    transparent 2rem calc(100% - 2rem),
+    var(--edge-strong) calc(100% - 2rem) 100%
+  )
+    1;
+}
+
+/* The hairline that races across once the panel is open. */
+[data-js] .masthead__nav-sweep {
+  display: block;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 5.5rem;
+  height: 1px;
+  transform-origin: left center;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  opacity: 0;
+}
+
+[data-js] .masthead__nav-list {
+  gap: 0;
+  z-index: 1;
+}
+
+[data-js] .navitem {
+  border-top: 1px solid var(--edge-cool);
+}
+
+[data-js] .navitem:last-of-type {
+  border-bottom: 1px solid var(--edge-cool);
+}
+
+[data-js] .navitem__link {
+  display: grid;
+  grid-template-columns: 3.25rem 1fr;
+  align-items: baseline;
+  gap: 0 0.75rem;
+  padding: clamp(0.7rem, 2.2vw, 1.1rem) 0;
+  border-bottom: 0;
+  color: var(--text);
+}
+
+[data-js] .navitem__index {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+  color: var(--gold-deep);
+  transition: color 200ms ease;
+}
+
+[data-js] .navitem__label {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 72;
+  font-weight: 600;
+  /* "Advantage" is the longest label: about 225px at 320px wide, inside a
+     content box of roughly 280px. Anything longer must be checked there. */
+  font-size: clamp(1.9rem, 1rem + 7vw, 3.6rem);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+}
+
+[data-js] .navitem__description {
+  display: block;
+  grid-column: 2;
+  font-size: 0.875rem;
+  color: var(--text-mute);
+}
+
+[data-js] .navitem__link:hover .navitem__label,
+[data-js] .navitem__link:focus-visible .navitem__label,
+[data-js] .navitem__link[aria-current="true"] .navitem__label {
+  background: linear-gradient(96deg, var(--gold-bright) 8%, var(--gold) 52%, var(--gold-deep) 96%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+[data-js] .navitem__link:hover .navitem__index,
+[data-js] .navitem__link:focus-visible .navitem__index,
+[data-js] .navitem__link[aria-current="true"] .navitem__index {
+  color: var(--gold-bright);
+}
+
+[data-js] .masthead__cta {
+  z-index: 1;
+  margin-top: 2rem;
+  align-self: start;
+}
+
+/* The page behind the open menu holds still. */
+[data-nav-locked] {
+  overflow: hidden;
+}
+
+/*
+ * Desktop is unchanged from what it always was: a row of small links. Every
+ * selector here is written with [data-js] so it outweighs the menu rules
+ * above, which carry that attribute too — and repeated bare so the fallback
+ * gets the same row when no script ever runs.
+ */
 @media (min-width: 60rem) {
-  .masthead__toggle {
+  .masthead__toggle,
+  [data-js] .masthead__toggle {
     display: none;
   }
 
   .masthead__nav,
-  .masthead__nav[data-open] {
+  [data-js] .masthead__nav,
+  [data-js] .masthead__nav[data-open] {
     position: static;
+    z-index: auto;
     display: flex;
+    flex-direction: row;
     align-items: center;
+    justify-content: flex-end;
     gap: 2rem;
     padding: 0;
     background: none;
     border: 0;
     backdrop-filter: none;
+    overflow: visible;
+    visibility: visible;
+    clip-path: none;
   }
 
-  .masthead__nav ul {
+  /* No scanline, no brackets, no sweep on a masthead row. */
+  [data-js] .masthead__nav::before,
+  [data-js] .masthead__nav::after,
+  [data-js] .masthead__nav-sweep {
+    content: none;
+    display: none;
+  }
+
+  .masthead__nav-list,
+  [data-js] .masthead__nav-list {
     flex-direction: row;
     gap: 1.75rem;
   }
 
-  .masthead__nav a {
-    padding: 0.25rem 0;
-    font-size: 0.875rem;
-    border-bottom: 1px solid transparent;
+  [data-js] .navitem,
+  [data-js] .navitem:last-of-type {
+    border: 0;
   }
 
-  .masthead__cta {
+  .navitem__link,
+  [data-js] .navitem__link {
+    display: block;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid transparent;
+    color: var(--text-soft);
+  }
+
+  .navitem__label,
+  [data-js] .navitem__label {
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+  }
+
+  [data-js] .navitem__index,
+  [data-js] .navitem__description {
+    display: none;
+  }
+
+  /* The gradient is a menu flourish; on the row, the link just turns gold. */
+  [data-js] .navitem__link:hover .navitem__label,
+  [data-js] .navitem__link:focus-visible .navitem__label,
+  [data-js] .navitem__link[aria-current="true"] .navitem__label {
+    background: none;
+    -webkit-background-clip: border-box;
+    background-clip: border-box;
+    color: inherit;
+  }
+
+  .masthead__cta,
+  [data-js] .masthead__cta {
     margin-top: 0;
+    align-self: auto;
   }
 }
 
@@ -1665,6 +1907,16 @@ main {
      returns before it ever sets data-session-playing. */
   .roster__pulse {
     animation: none;
+  }
+
+  /* The menu opens on the spot. nav.js skips the timeline entirely under
+     reduced motion, so these are the states it lands in. */
+  [data-js] .masthead__nav[data-open],
+  [data-js] .masthead__nav[data-open] .navitem,
+  [data-js] .masthead__nav[data-open] .masthead__cta {
+    opacity: 1;
+    transform: none;
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
   }
 
   [data-reveal] {

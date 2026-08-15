@@ -1,9 +1,119 @@
 /**
- * nav.js — the masthead: mobile disclosure, scrolled state, current section.
+ * nav.js — the masthead: the full-screen menu, scrolled state, current section.
  *
- * The navigation is plain anchor links that work without this file. Everything
- * here is an enhancement on top of markup that is already correct.
+ * The links are plain anchors and they are in the page whether this file runs
+ * or not. What this file adds is the menu they live inside on a phone: the
+ * stylesheet only hides them behind a button once the inline flag in <head>
+ * says a script is running, so nothing here is load-bearing for navigation.
  */
+
+import { motionAllowed } from "./motion.js";
+
+const STAGGER_MS = 60;
+/** Kept in step with the clip-path transition in site.css. */
+const WIPE_MS = 460;
+
+/** Opened and closed as a unit: nothing here half-applies. */
+function createMenu(toggle, panel) {
+  const items = [...panel.querySelectorAll("[data-nav-item]")];
+  const sweep = panel.querySelector("[data-nav-sweep]");
+  const root = document.documentElement;
+
+  // Everything outside the menu, made inert while it is open. The browser's
+  // own focus containment is better than any Tab loop written here.
+  const outside = [...document.querySelectorAll("main, footer")];
+
+  let anime = null;
+  let timeline = null;
+  let open = false;
+
+  /** The state the panel must end in, animation or no animation. */
+  function settle() {
+    for (const item of items) {
+      item.style.opacity = "";
+      item.style.transform = "";
+    }
+    if (sweep !== null) {
+      sweep.style.opacity = "";
+      sweep.style.transform = "";
+    }
+  }
+
+  async function play() {
+    if (!motionAllowed()) return;
+
+    // Loaded on first open, never before: a visitor who does not open the menu
+    // should not pay for the animation library that decorates it.
+    if (anime === null) {
+      anime = (await import("../vendor/anime.es.js")).default;
+    }
+
+    timeline?.pause();
+
+    // The wipe itself is a CSS transition on the panel's clip-path, fired by
+    // [data-open]. Anime.js does not interpolate polygon() — it would snap
+    // between shapes — while the browser tweens two polygons of equal vertex
+    // count natively. What is left here is what Anime.js is good at: numbers.
+    timeline = anime.timeline({ easing: "easeOutQuad" });
+
+    if (sweep !== null) {
+      timeline.add({
+        targets: sweep,
+        opacity: [0, 1, 0.55],
+        scaleX: [0, 1],
+        duration: 420,
+        easing: "easeOutExpo",
+      }, WIPE_MS * 0.45);
+    }
+
+    timeline.add({
+      targets: items,
+      opacity: [0, 1],
+      translateY: [18, 0],
+      delay: anime.stagger(STAGGER_MS),
+      duration: 420,
+    }, WIPE_MS * 0.6);
+
+    await timeline.finished;
+  }
+
+  function setOpen(next) {
+    if (next === open) return;
+    open = next;
+
+    toggle.setAttribute("aria-expanded", String(open));
+    if (open) panel.setAttribute("data-open", "");
+    else panel.removeAttribute("data-open");
+
+    // The page behind holds still, and cannot be reached by Tab.
+    if (open) root.setAttribute("data-nav-locked", "");
+    else root.removeAttribute("data-nav-locked");
+    for (const element of outside) element.inert = open;
+
+    if (!open) {
+      timeline?.pause();
+      timeline = null;
+      settle();
+      toggle.focus();
+      return;
+    }
+
+    // Hide the pieces the timeline is about to bring in, but only when there
+    // is going to be a timeline — otherwise the menu would open empty.
+    if (motionAllowed()) {
+      for (const item of items) item.style.opacity = "0";
+      if (sweep !== null) sweep.style.opacity = "0";
+    }
+
+    items[0]?.querySelector("a")?.focus({ preventScroll: true });
+
+    // A menu that only opens when its animation succeeds is not a menu. Any
+    // failure lands on the finished state instead.
+    void play().catch(() => settle());
+  }
+
+  return { setOpen, isOpen: () => open };
+}
 
 export function initNav(root = document) {
   const masthead = root.querySelector("[data-sticky]");
@@ -11,27 +121,26 @@ export function initNav(root = document) {
   const panel = root.querySelector("#site-nav");
   if (masthead === null) return;
 
-  /* --- mobile disclosure --- */
+  /* --- the menu --- */
   if (toggle !== null && panel !== null) {
-    const setOpen = (open) => {
-      toggle.setAttribute("aria-expanded", String(open));
-      if (open) panel.setAttribute("data-open", "");
-      else panel.removeAttribute("data-open");
-    };
+    const menu = createMenu(toggle, panel);
 
-    toggle.addEventListener("click", () => {
-      setOpen(toggle.getAttribute("aria-expanded") !== "true");
-    });
+    toggle.addEventListener("click", () => menu.setOpen(!menu.isOpen()));
 
     panel.addEventListener("click", (event) => {
-      if (event.target instanceof HTMLAnchorElement) setOpen(false);
+      if (event.target instanceof HTMLElement && event.target.closest("a") !== null) {
+        menu.setOpen(false);
+      }
     });
 
     document.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape") return;
-      if (toggle.getAttribute("aria-expanded") !== "true") return;
-      setOpen(false);
-      toggle.focus();
+      if (event.key === "Escape" && menu.isOpen()) menu.setOpen(false);
+    });
+
+    // Growing past the breakpoint turns the menu back into a masthead row; an
+    // open panel left over from a narrow window would take the lock with it.
+    globalThis.matchMedia("(min-width: 60rem)").addEventListener("change", (event) => {
+      if (event.matches) menu.setOpen(false);
     });
   }
 

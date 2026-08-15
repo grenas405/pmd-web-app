@@ -79,9 +79,12 @@ The posture is deny-by-default, and it is enforced in three places that have to 
 permission flags, the systemd sandbox, and the code.
 
 **Content-Security-Policy.** `default-src 'none'` with no `unsafe-inline`, no `unsafe-eval`, and no
-wildcards. The single inline script — the JSON-LD metadata — is admitted by its SHA-256 hash,
-computed at startup from the exact string the renderer emits, so the policy and the page cannot
-drift apart. There are no third-party assets of any kind: no CDN, no analytics, no remote fonts.
+wildcards. Two inline scripts — the JSON-LD metadata and a one-line flag saying JavaScript is
+running — are each admitted by their SHA-256 hash, computed at startup by `inlineScriptHashes()` in
+`src/render/layout.ts`, the module that also emits them, so the policy and the page cannot drift
+apart. A test reads every inline script back out of the served HTML and checks its hash is in the
+header, so a third one added and forgotten fails the suite rather than a browser console. There are
+no third-party assets of any kind: no CDN, no analytics, no remote fonts.
 
 **Also sent on every response:** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
 `Referrer-Policy: strict-origin-when-cross-origin`, a `Permissions-Policy` denying every feature the
@@ -317,7 +320,7 @@ Server-rendered HTML that is complete before any script runs. JavaScript is four
 each optional and independently guarded — if one throws, the others still run and the page still
 works:
 
-- `nav.js` — mobile disclosure, scrolled state, current-section marking
+- `nav.js` — the full-screen menu, scrolled state, current-section marking
 - `typewriter.js` — the hero's rotating discipline (first word is in the HTML)
 - `reveal.js` — fades in sections that are below the fold, and only those
 - `contact.js` — upgrades the real `<form>` to `fetch`; falls back to a normal POST if anything goes
@@ -330,6 +333,14 @@ the visitor prefers reduced motion.
 Anime.js has exactly two callers, `sky.js` and `session.js`, and neither loads it eagerly: the sky
 waits for idle, and the session waits until the hero terminal is actually on screen. The vendored
 build is 42 KB, which is too much to put in front of a hero that is already readable without it.
+
+The navigation keeps the same contract from the other direction. The links are ordinary anchors in
+the markup, and the stylesheet decides how they are presented: with the enhancement flag set they
+become a full-screen menu behind a button; without it they are a plain stacked list and there is no
+button at all, because a button that needs a script to work is not navigation. Opening the menu
+lazily imports Anime.js for the hairline sweep and the staggered rise, while the diagonal wipe is a
+CSS `clip-path` transition — Anime.js cannot interpolate `polygon()` and would snap between shapes.
+If that import fails, the menu still opens.
 
 The hero session is worth understanding as a pattern, because it is the same contract every
 enhancement here keeps. `src/content/session.ts` holds the transcript as data; `home.ts` renders
