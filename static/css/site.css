@@ -1440,6 +1440,21 @@ main {
   margin-bottom: 0.35rem;
 }
 
+/* The case study is checkable, so the name is the way through to the site.
+   Underlined on the gold hairline rather than the default, so it reads as a
+   link at display size without shouting. */
+.project__link {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid var(--edge-strong);
+}
+
+.project__link:hover,
+.project__link:focus-visible {
+  color: var(--gold-bright);
+  border-bottom-color: currentColor;
+}
+
 .project__summary {
   max-width: 46ch;
   font-size: 0.9375rem;
@@ -1488,6 +1503,10 @@ main {
   gap: 1.5rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--edge-cool);
+}
+
+.project__stack .chips {
+  margin-top: 0;
 }
 
 @media (min-width: 56rem) {

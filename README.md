@@ -18,7 +18,7 @@ Requires [Deno](https://deno.com) 2.x. Nothing else — there is no `npm install
 
 ```sh
 deno task dev      # http://127.0.0.1:8002 with file watching
-deno task test     # 112 tests
+deno task test     # 116 tests
 deno task verify   # fmt --check, lint, type check, tests
 ```
 
@@ -312,11 +312,14 @@ Content is data, kept apart from the code that renders it:
 
 - `src/content/site.ts` — name, email, links, the hero's rotating disciplines
 - `src/content/narrative.ts` — the argument: approach, advantage, process
-- `src/content/projects.ts` — the portfolio
+- `src/content/projects.ts` — the portfolio: two real engagements, Heavenly Roofing and Mercy Seat
+  Ministries
+- `src/content/live.ts` — the sites running right now, which the roster and the hero both draw on
 
-> **The four portfolio entries are illustrative placeholders** written to show the shape of the
-> section. Replace them with real engagements before the site goes live; the page renders whatever
-> is in that array.
+> Case studies are **real engagements only**. A test refuses any entry whose `href` is not a host on
+> the roster in `live.ts`, for the same reason the hero rotation carries the same rule: a claim a
+> visitor can disprove in one click costs more than the claim was ever worth. The four fictional
+> placeholders that once filled this section were deleted outright rather than kept for reference.
 
 ---
 

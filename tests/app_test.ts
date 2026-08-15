@@ -6,11 +6,13 @@
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { liveSites } from "../src/content/live.ts";
+import { projects } from "../src/content/projects.ts";
 import { session, sessions, sessionSummary } from "../src/content/session.ts";
 import { createApp } from "../src/app.ts";
 import { parseConfig } from "../src/config.ts";
 import { silentLogger } from "../src/log.ts";
 import { scriptHash } from "../src/http/security.ts";
+import { escapeHtml } from "../src/render/html.ts";
 import { inlineScriptHashes } from "../src/render/layout.ts";
 import { nav } from "../src/content/site.ts";
 import { faq } from "../src/content/faq.ts";
@@ -376,5 +378,30 @@ Deno.test("a tampered plan is dropped, not turned into an error", async () => {
     assertEquals(stored[0]?.plan, null);
   } finally {
     kv.close();
+  }
+});
+
+Deno.test("the work section shows real, clickable case studies", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  for (const project of projects) {
+    assertStringIncludes(body, project.name);
+    assertStringIncludes(body, `href="${project.href}"`);
+    // Through the same escaper the renderer uses: the summaries contain
+    // apostrophes, which reach the page as &#39; and would otherwise make this
+    // assertion fail for the one reason that is not a bug.
+    assertStringIncludes(body, escapeHtml(project.summary));
+  }
+});
+
+Deno.test("no invented engagement survives anywhere in the page", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  // These four were fictional placeholders. They were removed rather than
+  // commented out, and this fails loudly if one is ever pasted back.
+  for (const invented of ["Route Ledger", "Shop Scheduler", "Permit Intake", "Counter Menu"]) {
+    assert(!body.includes(invented), `the fictional case study "${invented}" is back on the page`);
   }
 });

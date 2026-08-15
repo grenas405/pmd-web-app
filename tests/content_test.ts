@@ -6,6 +6,7 @@
 
 import { assert, assertEquals } from "@std/assert";
 import { liveSites } from "../src/content/live.ts";
+import { projects } from "../src/content/projects.ts";
 import { faq } from "../src/content/faq.ts";
 import { comparison, included, notIncluded, plan, sources } from "../src/content/pricing.ts";
 import { nav } from "../src/content/site.ts";
@@ -169,5 +170,52 @@ Deno.test("every FAQ entry is a real question with a real answer", () => {
     assert(entry.answer.trim().length > 40, `${entry.question} has a stub for an answer`);
     assert(!asked.has(entry.question), `asked twice: ${entry.question}`);
     asked.add(entry.question);
+  }
+});
+
+Deno.test("every case study is complete enough to render", () => {
+  assert(projects.length > 0, "the work section would be empty");
+
+  const slugs = new Set<string>();
+  for (const project of projects) {
+    for (
+      const [field, value] of [
+        ["name", project.name],
+        ["summary", project.summary],
+        ["year", project.year],
+        ["sector", project.sector],
+        ["problem", project.problem],
+        ["built", project.built],
+      ] as const
+    ) {
+      assert(value.trim().length > 0, `${project.slug} has no ${field}`);
+    }
+
+    assert(project.outcome.length > 0, `${project.slug} claims nothing changed`);
+    assert(project.stack.length > 0, `${project.slug} lists nothing it was built with`);
+    for (const line of [...project.outcome, ...project.stack]) {
+      assert(line.trim().length > 0, `${project.slug} has a blank list entry`);
+    }
+
+    // The slug becomes a DOM id and an aria-labelledby target.
+    assert(/^[a-z0-9-]+$/.test(project.slug), `${project.slug} is not URL-safe`);
+    assert(!slugs.has(project.slug), `${project.slug} is used twice`);
+    slugs.add(project.slug);
+  }
+});
+
+Deno.test("every case study links to a site we actually run", () => {
+  // The same rule that binds the hero rotation to real hosts. A case study
+  // pointing somewhere we do not run is a claim a visitor disproves in one
+  // click, which is worse than having no case study at all.
+  const hosts = new Set(liveSites.map((entry) => entry.host));
+
+  for (const project of projects) {
+    const url = new URL(project.href);
+    assertEquals(url.protocol, "https:", `${project.slug} does not link over https`);
+    assert(
+      hosts.has(url.hostname),
+      `${project.name} links to ${url.hostname}, which is not on the roster in live.ts`,
+    );
   }
 });

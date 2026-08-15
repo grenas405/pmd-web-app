@@ -343,7 +343,9 @@ function projectCard(project: Project): Html {
       .slug}-title">
       <header class="project__header">
         <div class="project__identity">
-          <h3 class="project__title" id="project-${project.slug}-title">${project.name}</h3>
+          <h3 class="project__title" id="project-${project.slug}-title">
+            <a class="project__link" href="${project.href}" rel="noopener">${project.name}</a>
+          </h3>
           <p class="project__summary">${project.summary}</p>
         </div>
         <p class="project__meta">
@@ -356,26 +358,28 @@ function projectCard(project: Project): Html {
         <div class="project__block">
           <h4 class="project__heading">The problem</h4>
           <p class="prose prose--tight">${project.problem}</p>
-          <h4 class="project__heading">What was built</h4>
-          <p class="prose prose--tight">${project.built}</p>
         </div>
         <div class="project__block">
-          <h4 class="project__heading">Architecture</h4>
-          <p class="prose prose--tight">${project.architecture}</p>
-          <h4 class="project__heading">Why this way</h4>
-          <p class="prose prose--tight">${project.rationale}</p>
+          <h4 class="project__heading">What it does</h4>
+          <p class="prose prose--tight">${project.built}</p>
         </div>
       </div>
 
       <footer class="project__footer">
-        <ul class="project__outcomes">
-          ${project.outcome.map((line) =>
-            html`<li><span class="project__tick" aria-hidden="true"></span>${line}</li>`
-          )}
-        </ul>
-        <ul class="chips" aria-label="Technologies used in ${project.name}">
-          ${project.stack.map((tech) => html`<li class="chip">${tech}</li>`)}
-        </ul>
+        <div class="project__changed">
+          <h4 class="project__heading">What changed</h4>
+          <ul class="project__outcomes">
+            ${project.outcome.map((line) =>
+              html`<li><span class="project__tick" aria-hidden="true"></span>${line}</li>`
+            )}
+          </ul>
+        </div>
+        <div class="project__stack">
+          <h4 class="project__heading">Built with</h4>
+          <ul class="chips" aria-label="Built with, for ${project.name}">
+            ${project.stack.map((tech) => html`<li class="chip">${tech}</li>`)}
+          </ul>
+        </div>
       </footer>
     </article>
   `;
@@ -420,8 +424,9 @@ function workSection(): Html {
         Software for the businesses that keep this city running.
       </h2>
       <p class="section__lede">
-        Not demos. Systems that a shop, a distributor or a contractor depends on during business
-        hours — each one small enough to explain in a paragraph and to maintain for years.
+        Not demos. Two Oklahoma City organisations that depend on this software during business
+        hours — a roofing company and a church — each small enough to explain in a paragraph, and
+        each one click away if you want to check it.
       </p>
       ${liveRoster()}
       <div class="projects">${projects.map(projectCard)}</div>

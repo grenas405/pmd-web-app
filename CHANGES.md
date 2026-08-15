@@ -30,6 +30,31 @@
 - Desktop is untouched: at 60rem the same markup flattens back into the masthead row it has always
   been, with the indexes and descriptions hidden.
 
+### Real case studies, and only real ones
+
+- **The four invented engagements are gone** — Route Ledger, Shop Scheduler, Permit Intake and
+  Counter Menu, deleted outright rather than commented out or kept "for reference". They were the
+  last fictional thing on a page whose whole argument is that its evidence survives checking, and a
+  placeholder that lingers as a commented block is one careless uncomment from being published
+  again.
+- In their place, the two engagements that actually exist: **Heavenly Roofing LLC**
+  (`heavenlyroofingllc.com`) and **Mercy Seat Ministries** (`msmokc.org`). Each card's title links
+  to the live site, so a reader can check the claim in one click.
+- **The card was reshaped for the person reading it.** "Architecture" and "Why this way" — two
+  blocks written for engineers — become "What it does" and "What changed", with the technologies
+  kept as a short "Built with" line rather than an unexplained row of chips. `architecture` and
+  `rationale` leave the `Project` type; `href` joins it.
+- Heavenly Roofing's partner follow-up board is described **generically** — every conversation in
+  one place, bilingual templates, one-click drafts. What it does is worth showing; who it targets
+  and how it scores them is the client's competitive strategy, and his competitors can read this
+  page too.
+- **`projects.ts` now has tests**, which is how four fictional studies survived this long beside a
+  hero and roster that were both guarded. Entries must be complete and uniquely slugged, and every
+  `href` must be a host on the roster in `live.ts` — the same rule already binding the hero
+  rotation. A separate test fails if any of the four invented names ever reappears in the page.
+- The work section's lede promised "a shop, a distributor or a contractor", which described the
+  placeholders. It now names what is actually there.
+
 ### It says what it costs
 
 - **A pricing page at `/pricing`.** One plan: $295 to design, build and launch on a twelve-month
