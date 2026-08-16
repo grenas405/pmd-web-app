@@ -5,12 +5,13 @@
   "tasks": {
     "dev": "deno run --unstable-kv --watch=src,static,main.ts --allow-net=127.0.0.1 --allow-read=static,var --allow-write=var --allow-env main.ts",
     "start": "deno run --unstable-kv --allow-net=127.0.0.1 --allow-read=static,var --allow-write=var --allow-env main.ts",
-    "test": "deno test --unstable-kv --allow-read=static,var --allow-write=var --allow-env --allow-net=127.0.0.1",
+    "test": "deno test --unstable-kv --allow-read=static,var --allow-write=var --allow-env --allow-net=127.0.0.1 tests/",
+    "e2e": "deno test -A --unstable-kv --node-modules-dir=auto e2e/site_e2e.ts",
     "inbox": "deno run --unstable-kv --allow-read=var --allow-write=var --allow-env scripts/inbox.ts",
     "check": "deno check main.ts src/**/*.ts tests/**/*.ts",
     "lint": "deno lint",
     "fmt": "deno fmt",
-    "verify": "deno fmt --check && deno lint && deno check main.ts && deno test --unstable-kv --allow-read=static,var --allow-write=var --allow-env --allow-net=127.0.0.1"
+    "verify": "deno fmt --check && deno lint && deno check main.ts && deno test --unstable-kv --allow-read=static,var --allow-write=var --allow-env --allow-net=127.0.0.1 tests/"
   },
   "imports": {
     "@std/http": "jsr:@std/http@^1.1.3",

@@ -160,7 +160,7 @@ function header(): Html {
             `
           )}
         </ol>
-        <a class="button button--ghost masthead__cta" href="#contact" data-nav-item>
+        <a class="button button--ghost masthead__cta" href="/#contact" data-nav-item>
           Start a project
         </a>
       </nav>

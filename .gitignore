@@ -5,6 +5,10 @@ var/
 .env
 .env.*
 
+# Playwright's dependencies, fetched on demand by `deno task e2e`.
+node_modules/
+deno.lock.e2e
+
 # Editor and OS noise.
 .DS_Store
 *.swp

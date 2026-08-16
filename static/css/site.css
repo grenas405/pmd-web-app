@@ -253,6 +253,21 @@ select {
   backdrop-filter: blur(14px) saturate(140%);
 }
 
+/*
+ * A backdrop-filter makes an element the containing block for its
+ * position: fixed descendants, and the menu panel is one of them. Once the
+ * page had scrolled, `inset: 0` stopped meaning the viewport and started
+ * meaning this ~4.5rem bar, so the menu opened as a strip across the header.
+ *
+ * The transition goes too: the element is a containing block for as long as
+ * the filter is anything but none, so fading it out over 240ms would leave the
+ * panel clipped for the whole of the opening wipe. Nobody sees the frosted
+ * header while a full-screen menu is covering it.
+ */
+.masthead[data-menu-open] {
+  /* bug reintroduced on purpose */
+}
+
 .masthead__mark {
   display: flex;
   align-items: center;

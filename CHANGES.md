@@ -30,6 +30,37 @@
 - Desktop is untouched: at 60rem the same markup flattens back into the masthead row it has always
   been, with the indexes and descriptions hidden.
 
+### Fixed: the menu opening as a strip, and links that went nowhere
+
+- **The menu only filled the screen at the top of the page.** `.masthead[data-scrolled]` carries a
+  `backdrop-filter`, and a `backdrop-filter` makes an element the **containing block for its
+  `position: fixed` descendants** — the nav panel being one. Twenty-four pixels down, `nav.js` adds
+  the attribute and `inset: 0` stops meaning the viewport and starts meaning the masthead's own
+  ~4.5rem bar. `nav.js` now sets `data-menu-open` on the masthead while the menu is open and the
+  stylesheet drops the filter, along with its transition — the element stays a containing block for
+  as long as the filter is anything but `none`, so fading it out would leave the panel clipped for
+  the whole of the opening wipe.
+- **On `/pricing`, every nav link went nowhere.** They were bare fragments (`#contact`, `#work`),
+  which resolve against the page being read — so on `/pricing` they became `/pricing#contact`,
+  matching nothing. They are now rooted (`/#contact`): same-document scrolling on the landing page,
+  a trip home from anywhere else. The masthead CTA had the same fault.
+- `nav.js` derived section ids with `href.slice(1)`, which would have silently returned `#work` for
+  the new hrefs and stopped the current-section highlighting from ever matching. It parses the hash
+  now. `tests/content_test.ts` requires nav hrefs to be rooted rather than bare.
+
+### Browser tests, because every bug here has been a rendering bug
+
+- **`deno task e2e`** drives a real Chromium at 375, 768 and 1280 px: the menu fills the viewport
+  after scrolling, the close button returns focus to the toggle, the masthead survives following a
+  nav link, `/pricing`'s nav links land on the landing page, the laptop layout is a row with no
+  toggle, and nothing scrolls sideways on either page. Six of those are bugs that have actually
+  happened here and could not have failed in `tests/`, because none of them are wrong in the HTML.
+- Files are `e2e/*_e2e.ts`, **not** `*_test.ts`: `deno test` with no path walks the whole project,
+  and `scripts/deploy.sh` runs `deno task verify` on the VPS where there is no browser. The `test`
+  task is pinned to `tests/` for the same reason, and the e2e task is never part of the deploy gate.
+- The harness starts the real server on a free port with its own throwaway KV database, waits for
+  `/healthz`, and removes the database afterwards.
+
 ### A way out of the menu
 
 - **A small × in the open menu's top-right corner.** The panel is `z-index: 40` and the toggle is an

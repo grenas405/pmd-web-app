@@ -52,27 +52,33 @@ export const site = {
   ],
 } as const;
 
+/*
+ * Rooted, not bare. `#contact` is relative to whatever page is being read, so
+ * on /pricing it resolved to /pricing#contact and matched nothing. `/#contact`
+ * is same-document scrolling on the landing page and a trip home from anywhere
+ * else.
+ */
 export const nav: readonly NavLink[] = [
   {
-    href: "#approach",
+    href: "/#approach",
     label: "Approach",
     index: "01",
     description: "How the work gets done",
   },
   {
-    href: "#work",
+    href: "/#work",
     label: "Work",
     index: "02",
     description: "Sites running right now",
   },
   {
-    href: "#advantage",
+    href: "/#advantage",
     label: "Advantage",
     index: "03",
     description: "Why one person, not a firm",
   },
   {
-    href: "#process",
+    href: "/#process",
     label: "Process",
     index: "04",
     description: "From counter to launch",
@@ -84,7 +90,7 @@ export const nav: readonly NavLink[] = [
     description: "What it costs, in full",
   },
   {
-    href: "#contact",
+    href: "/#contact",
     label: "Contact",
     index: "06",
     description: "Start a project",

@@ -94,12 +94,13 @@ Deno.test("every nav entry can fill a row of the menu", () => {
     assert(link.description.trim().length > 0, `${link.label} has no description`);
     assert(/^\d{2}$/.test(link.index), `${link.label} index is not zero-padded: ${link.index}`);
 
-    // Pricing is a page; the rest are anchors on this one. Both are legitimate
-    // menu destinations, and neither may be an off-site URL.
-    assert(
-      link.href.startsWith("#") || link.href.startsWith("/"),
-      `${link.href} is neither an in-page anchor nor a site path`,
-    );
+    // Every destination is rooted at the site, never bare. A bare `#contact`
+    // is relative to whatever page is being read, so on /pricing it resolved
+    // to /pricing#contact and went nowhere — the menu is in the layout and
+    // therefore renders on every page, so it cannot assume it is on the
+    // landing page.
+    assert(link.href.startsWith("/"), `${link.href} is not rooted at the site`);
+    assert(!link.href.startsWith("//"), `${link.href} is protocol-relative, not a site path`);
     assert(!indexes.has(link.index), `index ${link.index} is used twice`);
     indexes.add(link.index);
   }

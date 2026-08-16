@@ -14,7 +14,7 @@ const STAGGER_MS = 60;
 const WIPE_MS = 460;
 
 /** Opened and closed as a unit: nothing here half-applies. */
-function createMenu(toggle, panel) {
+function createMenu(toggle, panel, masthead) {
   const items = [...panel.querySelectorAll("[data-nav-item]")];
   const sweep = panel.querySelector("[data-nav-sweep]");
   const root = document.documentElement;
@@ -85,6 +85,13 @@ function createMenu(toggle, panel) {
     if (open) panel.setAttribute("data-open", "");
     else panel.removeAttribute("data-open");
 
+    // The masthead's scrolled state carries a backdrop-filter, and a
+    // backdrop-filter makes an element the containing block for its
+    // position: fixed descendants — this panel among them. Left in place, the
+    // menu stops filling the viewport and bands across the header instead.
+    // The stylesheet drops the filter while this attribute is set.
+    masthead.toggleAttribute("data-menu-open", open);
+
     // The page behind holds still, and cannot be reached by Tab.
     if (open) root.setAttribute("data-nav-locked", "");
     else root.removeAttribute("data-nav-locked");
@@ -123,7 +130,7 @@ export function initNav(root = document) {
 
   /* --- the menu --- */
   if (toggle !== null && panel !== null) {
-    const menu = createMenu(toggle, panel);
+    const menu = createMenu(toggle, panel, masthead);
 
     toggle.addEventListener("click", () => menu.setOpen(!menu.isOpen()));
 
@@ -159,8 +166,11 @@ export function initNav(root = document) {
   const links = [...root.querySelectorAll("[data-nav-link]")];
   const targets = new Map();
   for (const link of links) {
-    const id = link.getAttribute("href")?.slice(1);
-    if (id === undefined || id === "") continue;
+    // Parsed, not sliced: these hrefs are `/#work` so they resolve from any
+    // page, and chopping the first character would leave "#work" here and
+    // quietly stop the current-section marking from ever matching.
+    const id = new URL(link.href, globalThis.location.href).hash.slice(1);
+    if (id === "") continue;
     const section = document.getElementById(id);
     if (section !== null) targets.set(section, link);
   }

@@ -20,6 +20,7 @@ Requires [Deno](https://deno.com) 2.x. Nothing else — there is no `npm install
 deno task dev      # http://127.0.0.1:8002 with file watching
 deno task test     # 122 tests
 deno task verify   # fmt --check, lint, type check, tests
+deno task e2e      # the checks that need a real browser
 ```
 
 To run it the way production does:
@@ -389,6 +390,24 @@ open, and `inert` still applies to a top-layer dialog nested beneath it.
 Accessibility and motion: one `<h1>`, no heading-level jumps, labels bound to every input, a skip
 link, visible focus rings, and `prefers-reduced-motion: reduce` honoured by both the CSS and the
 scripts.
+
+### Browser tests
+
+`deno task e2e` drives a real Chromium at phone, tablet and laptop widths. It exists because every
+bug a person has found in this site has been a rendering bug — a hero wider than the phone it was
+on, a sticky header that stopped sticking, a menu button buried under its own panel, a menu that
+opened as a strip across the masthead. None of them are wrong in the HTML, so none of them could
+fail in `tests/`; they only exist once a browser has laid the page out. Each case in
+`e2e/site_e2e.ts` is one that actually happened.
+
+The files are named `*_e2e.ts`, **not** `*_test.ts`, and deliberately so: `deno test` with no path
+walks the whole project, and `scripts/deploy.sh` runs `deno task verify` on the VPS, where there is
+no browser to drive. `deno task test` is pinned to `tests/` for the same reason.
+
+```sh
+deno run -A npm:playwright install chromium   # one time
+deno task e2e
+```
 
 ---
 
