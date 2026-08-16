@@ -11,6 +11,7 @@ import { initTypewriter } from "./typewriter.js";
 import { initReveal } from "./reveal.js";
 import { initContactForm } from "./contact.js";
 import { initSession } from "./session.js";
+import { initSplash } from "./splash.js";
 
 function attempt(name, start) {
   try {
@@ -27,6 +28,9 @@ attempt("contact form", initContactForm);
 // Cheap to start: it waits for the figure to be on screen before it imports
 // Anime.js, so nothing heavy happens here.
 attempt("session", initSession);
+// Sets two listeners and returns. Nothing is shown until six seconds have
+// passed and the reader is a quarter of the way down the page.
+attempt("splash", initSplash);
 
 // The night sky is the heaviest enhancement and the least important, so it is
 // loaded on its own, after everything else, and only when it will be used.

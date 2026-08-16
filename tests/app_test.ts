@@ -16,7 +16,7 @@ import { escapeHtml } from "../src/render/html.ts";
 import { inlineScriptHashes } from "../src/render/layout.ts";
 import { nav } from "../src/content/site.ts";
 import { faq } from "../src/content/faq.ts";
-import { comparison, plan, PLAN_ID, sources } from "../src/content/pricing.ts";
+import { comparison, plan, PLAN_ID, sources, splash } from "../src/content/pricing.ts";
 import { recentInquiries } from "../src/contact/store.ts";
 import { structuredData } from "../src/content/site.ts";
 
@@ -404,4 +404,52 @@ Deno.test("no invented engagement survives anywhere in the page", async () => {
   for (const invented of ["Route Ledger", "Shop Scheduler", "Permit Intake", "Counter Menu"]) {
     assert(!body.includes(invented), `the fictional case study "${invented}" is back on the page`);
   }
+});
+
+Deno.test("the splash is served closed, so no-JavaScript visitors never see it", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  const dialog = body.match(/<dialog[^>]*data-splash[^>]*>/);
+  assert(dialog !== null, "the landing page carries no splash dialog");
+
+  // Without `open`, a <dialog> is hidden in every browser. Adding it here
+  // would strand a visitor with no JavaScript inside a modal that has nothing
+  // to close it — which is the one way this feature could really hurt someone.
+  assert(!/\bopen\b/.test(dialog[0]), "the splash dialog is served already open");
+});
+
+Deno.test("the splash quotes the same numbers as the pricing page", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  assertStringIncludes(body, escapeHtml(splash.title));
+  assertStringIncludes(body, `$${plan.build}`);
+  assertStringIncludes(body, `$${plan.care}`);
+  assertStringIncludes(body, `$${plan.firstYear}`);
+  for (const point of splash.points) assertStringIncludes(body, escapeHtml(point));
+});
+
+Deno.test("the splash belongs to the landing page alone", async () => {
+  const app = await buildApp();
+
+  // On /pricing it would be an advertisement for the page already being read.
+  const pricingPage = await (await app(get("/pricing"), "203.0.113.1")).text();
+  assert(!pricingPage.includes("data-splash"), "the splash follows the visitor to /pricing");
+
+  const thanks = await (await app(get("/thank-you"), "203.0.113.1")).text();
+  assert(!thanks.includes("data-splash"), "the splash appears after a message is sent");
+});
+
+Deno.test("the splash sits outside main, where the menu cannot make it inert", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  // nav.js marks `main, footer` inert while the full-screen menu is open, and
+  // inert is inherited by a top-layer dialog nested under it. Inside <main>,
+  // the splash would be unclickable for anyone who had opened the menu once.
+  const mainEnd = body.indexOf("</main>");
+  const splashAt = body.indexOf("data-splash");
+  assert(mainEnd > -1 && splashAt > -1);
+  assert(splashAt > mainEnd, "the splash is nested inside <main>");
 });

@@ -126,3 +126,28 @@ export const headline = {
   multiple: "about a tenth",
   people: "one person, not a team of six",
 } as const;
+
+/**
+ * The promotional splash shown once on the landing page.
+ *
+ * Its copy lives here, beside the price it quotes, and every figure is
+ * interpolated from `plan` rather than typed — a modal that says $295 while
+ * the pricing page says something else is worse than no modal at all.
+ *
+ * Deliberately short. It has a few seconds of someone's attention and one job:
+ * make the number known and send them to /pricing.
+ */
+export const splash = {
+  eyebrow: "Oklahoma City · Launch offer",
+  title: "Your own website, built and live.",
+  lede:
+    "A complete site for your business, designed with you, launched on hosting in your name — " +
+    "and one person to text when you need it changed.",
+  points: [
+    "Built, launched and yours to keep",
+    "Domain registered and managed, first year included",
+    "Small changes whenever you need them",
+  ],
+  cta: "See what is included",
+  dismiss: "Not right now",
+} as const;

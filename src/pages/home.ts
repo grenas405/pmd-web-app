@@ -17,7 +17,7 @@ import { advantage, capabilities, process, translations } from "../content/narra
 import { type Project, projects } from "../content/projects.ts";
 import { liveSites } from "../content/live.ts";
 import { faq } from "../content/faq.ts";
-import { headline, plan as pricing, PLAN_ID, type PlanId } from "../content/pricing.ts";
+import { headline, plan as pricing, PLAN_ID, type PlanId, splash } from "../content/pricing.ts";
 import {
   session,
   type SessionLine,
@@ -209,6 +209,62 @@ function faqSection(): Html {
         )}
       </dl>
     </section>
+  `;
+}
+
+/**
+ * The promotional splash.
+ *
+ * A `<dialog>` with no `open` attribute: closed in every browser, and closed
+ * for a visitor with no JavaScript, who therefore never meets a modal they
+ * would have no way to dismiss. `splash.js` opens it with `showModal()`, which
+ * brings focus trapping, Escape and the backdrop with it — none of which has
+ * to be written here.
+ *
+ * The copy and every figure come from src/content/pricing.ts, so this cannot
+ * quote a price the pricing page has stopped charging.
+ */
+function pricingSplash(): Html {
+  const money = (amount: number) => `$${amount.toLocaleString("en-US")}`;
+  return html`
+    <dialog class="splash" data-splash aria-labelledby="splash-title">
+      <form method="dialog" class="splash__dismiss-form">
+        <button class="splash__close" type="submit" aria-label="Close this offer">
+          <span aria-hidden="true">×</span>
+        </button>
+      </form>
+
+      <div class="splash__body">
+        <p class="splash__eyebrow">
+          <span class="splash__dot" aria-hidden="true"></span>
+          ${splash.eyebrow}
+        </p>
+        <h2 class="splash__title" id="splash-title">${splash.title}</h2>
+        <p class="splash__lede">${splash.lede}</p>
+
+        <p class="splash__price">
+          <span class="splash__amount">${money(pricing.build)}</span>
+          <span class="splash__unit">to build and launch</span>
+          <span class="splash__care">then ${money(pricing.care)}/month</span>
+        </p>
+        <p class="splash__total">
+          ${money(pricing.firstYear)} for your whole first year, domain included.
+        </p>
+
+        <ul class="splash__points">
+          ${splash.points.map((point) =>
+            html`<li><span class="splash__tick" aria-hidden="true"></span>${point}</li>`
+          )}
+        </ul>
+
+        <div class="splash__actions">
+          <a class="button button--solid" href="/pricing">${splash.cta} ${arrowSvg()}</a>
+          <form method="dialog">
+            <button class="button button--ghost" type="submit">${splash.dismiss}</button>
+          </form>
+        </div>
+      </div>
+    </dialog>
   `;
 }
 
@@ -633,5 +689,5 @@ export function renderHome(
     ${faqSection()}
     ${contactSection(state, plan)}
   `;
-  return layout(context, homeMeta, main);
+  return layout(context, homeMeta, main, pricingSplash());
 }

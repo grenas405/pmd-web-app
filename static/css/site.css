@@ -550,7 +550,8 @@ select {
 }
 
 /* The page behind the open menu holds still. */
-[data-nav-locked] {
+[data-nav-locked],
+[data-splash-open] {
   overflow: hidden;
 }
 
@@ -1615,6 +1616,183 @@ main {
     grid-column: 3;
     grid-row: 1 / span 2;
   }
+}
+
+/* ----------------------------------------------------------------- splash - */
+
+/*
+ * The launch offer, shown once. A native <dialog>: closed until showModal(),
+ * which is why a visitor without JavaScript never meets a modal they could not
+ * dismiss. The browser supplies focus containment, Escape and the backdrop.
+ */
+
+.splash {
+  width: min(30rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  padding: 0;
+  overflow-y: auto;
+  color: var(--text);
+  background: linear-gradient(165deg, var(--navy-700), var(--navy-900));
+  border: 1px solid var(--edge-strong);
+  border-radius: 1rem;
+  box-shadow: 0 2.5rem 5rem rgba(0, 0, 0, 0.55);
+}
+
+.splash::backdrop {
+  background: rgba(5, 9, 15, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+/* Closed is the served state, so the entrance runs on open rather than on a
+   class the script has to add. */
+.splash[open] {
+  animation: splash-in 260ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@keyframes splash-in {
+  from {
+    opacity: 0;
+    transform: translateY(1rem) scale(0.98);
+  }
+}
+
+.splash__dismiss-form {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  margin: 0;
+  padding: 0.6rem 0.6rem 0;
+}
+
+.splash__close {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  font-size: 1.35rem;
+  line-height: 1;
+  color: var(--text-mute);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.splash__close:hover,
+.splash__close:focus-visible {
+  color: var(--gold-bright);
+  border-color: var(--edge);
+}
+
+.splash__body {
+  padding: 0.25rem clamp(1.25rem, 5vw, 2.25rem) clamp(1.5rem, 5vw, 2.25rem);
+}
+
+.splash__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+.splash__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 12px 2px rgba(217, 178, 95, 0.55);
+}
+
+.splash__title {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 60;
+  font-size: clamp(1.6rem, 1.3rem + 1.4vw, 2.1rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.75rem;
+}
+
+.splash__lede {
+  max-width: 40ch;
+  margin-bottom: 1.5rem;
+  color: var(--text-soft);
+}
+
+.splash__price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.7rem;
+  padding-top: 1.25rem;
+  border-top: var(--rule);
+}
+
+.splash__amount {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 144;
+  font-size: clamp(2.5rem, 2rem + 3vw, 3.5rem);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--gold);
+}
+
+.splash__unit {
+  color: var(--text-soft);
+}
+
+.splash__care {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.splash__total {
+  margin-top: 0.6rem;
+  font-size: 0.9375rem;
+  color: var(--text-mute);
+}
+
+.splash__points {
+  display: grid;
+  gap: 0.6rem;
+  margin: 1.4rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9375rem;
+  color: var(--text-soft);
+}
+
+.splash__points li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+}
+
+.splash__tick {
+  flex: none;
+  width: 0.45rem;
+  height: 0.45rem;
+  translate: 0 -0.15em;
+  border-radius: 50%;
+  background: var(--gold-deep);
+}
+
+.splash__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.75rem;
+}
+
+.splash__actions form {
+  margin: 0;
 }
 
 /* ------------------------------------------------------------------ promo - */

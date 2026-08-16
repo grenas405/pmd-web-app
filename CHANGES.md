@@ -30,6 +30,29 @@
 - Desktop is untouched: at 60rem the same markup flattens back into the masthead row it has always
   been, with the indexes and descriptions hidden.
 
+### A launch offer that knocks once
+
+- A **promotional splash** on the landing page: the $295 build, the $20 a month, the $535 first
+  year, and a way through to `/pricing`. Its copy and every figure live in `src/content/pricing.ts`
+  beside the price they quote, so the modal cannot advertise a number the pricing page has stopped
+  charging — a test compares the two.
+- It is a native `<dialog>`, served **without** the `open` attribute. That makes it closed in every
+  browser, and closed permanently for a visitor with no JavaScript, who would otherwise be handed a
+  modal with nothing to dismiss it. `showModal()` brings focus containment, Escape, the backdrop and
+  focus restoration; none of it is hand-rolled the way `nav.js` had to for a menu.
+- **It waits for a reader.** Six seconds _and_ a quarter of the page scrolled, both required, then
+  remembered in `localStorage` so the same person is never interrupted twice. The scroll condition
+  is the important half: Google's intrusive-interstitial guidance is aimed at popups that cover
+  content on arrival from search, and this one cannot reach anybody who has not stayed to read. On a
+  phone that means it is effectively scroll-triggered, which is exactly the intent.
+- Two interactions worth naming. It refuses to open over the full-screen menu — that modal was
+  opened deliberately and wins. And it is rendered as a **sibling of `<main>`**, because `nav.js`
+  marks `main, footer` inert while the menu is open and `inert` still applies to a top-layer dialog
+  nested beneath an inert ancestor; inside `<main>`, the splash would have been unclickable for
+  anyone who had ever opened the menu. `layout()` gained an `overlay` slot for exactly this.
+- Storage access is wrapped: Safari's private mode throws on `localStorage`, and failing closed
+  there shows the offer at most once per visit rather than never.
+
 ### Real case studies, and only real ones
 
 - **The four invented engagements are gone** — Route Ledger, Shop Scheduler, Permit Intake and

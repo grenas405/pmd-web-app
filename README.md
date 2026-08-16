@@ -18,7 +18,7 @@ Requires [Deno](https://deno.com) 2.x. Nothing else — there is no `npm install
 
 ```sh
 deno task dev      # http://127.0.0.1:8002 with file watching
-deno task test     # 116 tests
+deno task test     # 120 tests
 deno task verify   # fmt --check, lint, type check, tests
 ```
 
@@ -336,6 +336,7 @@ works:
   wrong
 - `session.js` — replays the hero's Claude Code session, rotating through three clients (the first
   transcript is already in the HTML)
+- `splash.js` — opens the launch-offer dialog, once, to a visitor who is actually reading
 
 `sky.js` — the gold shooting stars — is dynamically imported during idle time, and never at all when
 the visitor prefers reduced motion.
@@ -372,6 +373,18 @@ half of another. And every host the hero names must appear in `live.ts`, because
 is checkable and a claim a visitor can disprove in one click is worse than no claim at all. The
 other subjects reach the browser as an escaped `data-sessions` attribute, the same trick the hero
 typewriter uses for its words, so the Content-Security-Policy still needs no nonce.
+
+The promotional splash is the one thing on the page that interrupts, so it is built to interrupt as
+little as possible. It is a native `<dialog>` served **without** `open` — closed in every browser,
+and closed forever for a visitor with no JavaScript, who would otherwise meet a modal with nothing
+to dismiss it. `showModal()` supplies focus containment, Escape, the backdrop and focus restoration,
+none of which is worth hand-rolling. It opens only once six seconds have passed **and** the reader
+is a quarter of the way down, then records that in `localStorage` so the same person is never
+interrupted twice. Requiring the scroll is deliberate: Google's "intrusive interstitial" guidance
+targets popups that cover content on arrival from search, and this one cannot appear to anybody who
+has not stayed to read. It also refuses to open over the full-screen menu, and is rendered as a
+sibling of `<main>` rather than inside it — `nav.js` marks `main, footer` inert while the menu is
+open, and `inert` still applies to a top-layer dialog nested beneath it.
 
 Accessibility and motion: one `<h1>`, no heading-level jumps, labels bound to every input, a skip
 link, visible focus rings, and `prefers-reduced-motion: reduce` honoured by both the CSS and the

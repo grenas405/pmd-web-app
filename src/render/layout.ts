@@ -199,7 +199,19 @@ function sky(): Html {
   `;
 }
 
-export function layout(context: RenderContext, meta: PageMeta, main: Html): Html {
+/**
+ * @param overlay Rendered as a sibling of `<main>`, not inside it. `nav.js`
+ * marks `main, footer` inert while the full-screen menu is open, and `inert`
+ * still applies to a top-layer `<dialog>` nested under an inert ancestor — a
+ * modal rendered inside `<main>` would be unclickable the moment the menu had
+ * ever been opened. Outside, it is unaffected.
+ */
+export function layout(
+  context: RenderContext,
+  meta: PageMeta,
+  main: Html,
+  overlay: Html | null = null,
+): Html {
   return html`
     <!DOCTYPE html>
     <html lang="en-US">
@@ -209,6 +221,7 @@ export function layout(context: RenderContext, meta: PageMeta, main: Html): Html
       ${meta.full === false ? null : sky()}
       ${header()}
       <main id="main">${main}</main>
+      ${overlay}
       ${footer(context)}
       <script type="module" src="${context.asset("/js/main.js")}"></script>
       </body>
