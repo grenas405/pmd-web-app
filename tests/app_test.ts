@@ -474,3 +474,16 @@ Deno.test("nothing turns body into a scroll container under the sticky masthead"
   // near 60rem flips the desktop breakpoint and hides the toggle.
   assertStringIncludes(css, "scrollbar-gutter: stable");
 });
+
+Deno.test("the menu carries its own way out", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  // The open panel is z-index 40 and the toggle is an unpositioned sibling, so
+  // the menu paints over the button that opened it. Without this, Escape and
+  // tapping a link are the only ways back.
+  const panel = body.match(/<nav class="masthead__nav"[\s\S]*?<\/nav>/)?.[0] ?? "";
+  assert(panel.length > 0, "could not find the nav panel");
+  assertStringIncludes(panel, "data-nav-close");
+  assertStringIncludes(panel, "Close menu");
+});

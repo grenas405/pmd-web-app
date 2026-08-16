@@ -412,6 +412,46 @@ select {
   display: grid;
 }
 
+/*
+ * The way out of the open menu.
+ *
+ * The panel is z-index 40 and the toggle is an unpositioned sibling, so an
+ * open menu paints straight over the button that opened it — Escape and
+ * tapping a link were the only ways back. This sits exactly where the buried
+ * toggle is (0.9rem down, one gutter in, same 2.75rem target), so it reads as
+ * the hamburger becoming an ×.
+ *
+ * `display: none` by default: with no script there is no menu to close.
+ */
+.masthead__close {
+  display: none;
+}
+
+[data-js] .masthead__close {
+  position: absolute;
+  top: 0.9rem;
+  right: var(--gutter);
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--text-mute);
+  background: none;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+
+[data-js] .masthead__close:hover,
+[data-js] .masthead__close:focus-visible {
+  color: var(--gold-bright);
+  border-color: var(--edge-strong);
+}
+
 [data-js] .masthead__nav {
   position: fixed;
   inset: 0;
@@ -576,6 +616,8 @@ select {
  */
 @media (min-width: 60rem) {
   .masthead__toggle,
+  .masthead__close,
+  [data-js] .masthead__close,
   [data-js] .masthead__toggle {
     display: none;
   }

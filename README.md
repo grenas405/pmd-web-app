@@ -18,7 +18,7 @@ Requires [Deno](https://deno.com) 2.x. Nothing else — there is no `npm install
 
 ```sh
 deno task dev      # http://127.0.0.1:8002 with file watching
-deno task test     # 121 tests
+deno task test     # 122 tests
 deno task verify   # fmt --check, lint, type check, tests
 ```
 

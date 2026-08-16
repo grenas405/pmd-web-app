@@ -128,7 +128,10 @@ export function initNav(root = document) {
     toggle.addEventListener("click", () => menu.setOpen(!menu.isOpen()));
 
     panel.addEventListener("click", (event) => {
-      if (event.target instanceof HTMLElement && event.target.closest("a") !== null) {
+      if (!(event.target instanceof HTMLElement)) return;
+      // A link takes the visitor somewhere; the close button just puts the
+      // page back. Both end with the menu shut.
+      if (event.target.closest("a") !== null || event.target.closest("[data-nav-close]") !== null) {
         menu.setOpen(false);
       }
     });

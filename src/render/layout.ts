@@ -138,6 +138,15 @@ function header(): Html {
           copy of the links to keep in step with this one. -->
       <nav class="masthead__nav" id="site-nav" aria-label="Sections">
         <span class="masthead__nav-sweep" aria-hidden="true" data-nav-sweep></span>
+
+        <!-- Closes the menu from inside it, for the reader whose thumb is
+            nowhere near the toggle. Drawn only when [data-js] is present and
+            only below the breakpoint: without a script there is no menu to
+            close, and a button that does nothing is worse than no button. -->
+        <button class="masthead__close" type="button" data-nav-close>
+          <span aria-hidden="true">×</span>
+          <span class="visually-hidden">Close menu</span>
+        </button>
         <ol class="masthead__nav-list">
           ${nav.map((link) =>
             html`

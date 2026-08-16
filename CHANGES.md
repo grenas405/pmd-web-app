@@ -30,6 +30,17 @@
 - Desktop is untouched: at 60rem the same markup flattens back into the masthead row it has always
   been, with the indexes and descriptions hidden.
 
+### A way out of the menu
+
+- **A small × in the open menu's top-right corner.** The panel is `z-index: 40` and the toggle is an
+  unpositioned sibling, so an open menu paints straight over the button that opened it — Escape and
+  tapping a link were the only ways back, and the toggle's ×-animation was never visible to anyone.
+  The close button sits exactly where the buried toggle is (0.9rem down, one gutter in, the same
+  2.75rem target), so it reads as the hamburger becoming an ×.
+- Drawn only under `[data-js]` and only below 60rem: with no script there is no menu to close, and
+  at the desktop breakpoint the panel is a plain row of links. A button that does nothing is worse
+  than no button — the same rule the toggle already follows.
+
 ### Fixed: the menu button vanishing after a nav link
 
 - **`body` had `overflow-x: hidden`, which broke the sticky masthead.** Any `overflow` other than
