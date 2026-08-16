@@ -453,3 +453,24 @@ Deno.test("the splash sits outside main, where the menu cannot make it inert", a
   assert(mainEnd > -1 && splashAt > -1);
   assert(splashAt > mainEnd, "the splash is nested inside <main>");
 });
+
+Deno.test("nothing turns body into a scroll container under the sticky masthead", async () => {
+  const css = await Deno.readTextFile("static/css/site.css");
+
+  // `overflow-x: hidden` on body makes it a scroll container, and a scroll
+  // container is what `position: sticky` resolves against — the masthead would
+  // stick to the body's scroll box instead of the viewport and stop following
+  // the page, taking the menu button off-screen after any in-page nav link.
+  // `clip` clips without establishing one.
+  const body = css.match(/\nbody \{[\s\S]*?\n\}/)?.[0] ?? "";
+  assert(body.length > 0, "could not find the body rule");
+  assert(
+    !/overflow(-x)?:\s*(hidden|auto|scroll)/.test(body),
+    "body has an overflow that would break the sticky masthead",
+  );
+
+  // And the scroll lock must not resize the viewport: without a reserved
+  // gutter, opening the menu widens the page by the scrollbar's width, which
+  // near 60rem flips the desktop breakpoint and hides the toggle.
+  assertStringIncludes(css, "scrollbar-gutter: stable");
+});

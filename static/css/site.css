@@ -67,6 +67,12 @@ html {
   scroll-behavior: smooth;
   scroll-padding-top: 6rem;
   -webkit-text-size-adjust: 100%;
+
+  /* Reserve the scrollbar's width permanently. Without this, the scroll lock
+     below removes the scrollbar and the layout viewport grows by ~15px — on a
+     tablet sitting just under 60rem that is enough to start matching the
+     desktop breakpoint mid-interaction, which hides .masthead__toggle. */
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -79,7 +85,14 @@ body {
   font-synthesis-weight: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+
+  /* clip, not hidden. `hidden` makes body a scroll container, and a scroll
+     container is what `position: sticky` sticks to — so the sticky masthead
+     stuck to the body's scroll box instead of the viewport and simply stopped
+     following the page. Clicking a nav link jumped to the section and left the
+     header, and its menu button, behind at the top of the document.
+     `clip` does the same visual job without establishing a scroll container. */
+  overflow-x: clip;
 }
 
 h1,

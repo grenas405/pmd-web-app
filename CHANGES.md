@@ -30,6 +30,27 @@
 - Desktop is untouched: at 60rem the same markup flattens back into the masthead row it has always
   been, with the indexes and descriptions hidden.
 
+### Fixed: the menu button vanishing after a nav link
+
+- **`body` had `overflow-x: hidden`, which broke the sticky masthead.** Any `overflow` other than
+  `visible` makes an element a scroll container, and a scroll container is what `position: sticky`
+  resolves against — so the header stuck to the body's scroll box rather than the viewport and
+  stopped following the page at all. Clicking a nav link jumped to the section and left the header,
+  with its menu button, behind at the top of the document. It is now `overflow-x: clip`, which clips
+  identically without establishing a scroll container.
+- The intermittence had a cause worth recording: `overflow-x: hidden` on `body` normally propagates
+  to the viewport, but **only while `html`'s overflow is `visible`**. The menu's scroll lock sets
+  `overflow: hidden` on `html`, which stops that propagation and turns `body` into a real scroll
+  container mid-interaction — so whether sticky broke depended on whether the menu had been opened,
+  and on engine differences that show up on tablets first.
+- **`scrollbar-gutter: stable` on `html`.** Locking the scroll removed the scrollbar and widened the
+  layout viewport by around 15px. On a tablet sitting just under 60rem that is enough to start
+  matching the desktop breakpoint while the menu is open, which sets `.masthead__toggle` to
+  `display: none` — the button disappearing for a second reason, on exactly the devices where the
+  first one bites. Reserving the gutter keeps the width constant whether the page is locked or not.
+- A test reads the stylesheet back and fails if `body` regains a scroll-container `overflow`, or if
+  the gutter reservation goes away.
+
 ### A launch offer that knocks once
 
 - A **promotional splash** on the landing page: the $295 build, the $20 a month, the $535 first
