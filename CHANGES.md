@@ -2,6 +2,52 @@
 
 ## Unreleased
 
+### An admin area nothing links to
+
+- **`deno task admin-password`** sets or changes the password from the command line, prompting twice
+  with echo off. It never travels as a shell argument, so it cannot land in history or in `ps`. It
+  must run as the service user — `sudo -u pmdweb deno task admin-password` — because the unit's
+  `UMask=0027` leaves the KV file `0640` and owned by that account; the message says so when the
+  write is refused.
+- **Stored as PBKDF2-HMAC-SHA256, 210,000 iterations, random salt per password**, via Web Crypto —
+  no new dependency, since `crypto.subtle` was already in use for the asset and script hashes.
+  Compared in constant time, because `===` on a hash returns early and the time it took says how
+  much of the guess was right. Verified empirically: the same password twice produces different
+  records, and no plaintext survives in what is written.
+- **Failed attempts are counted in KV, not in memory.** `src/http/ratelimit.ts` is in-memory and
+  resets on every restart — fine for a contact form, wrong for a login, where it would hand an
+  attacker a fresh budget of guesses with every deploy. Five failures in fifteen minutes locks that
+  client out and the count survives a restart.
+- Sessions are 32 random bytes in KV with an 8-hour `expireIn`, so the expiry is the database's job
+  rather than a field somebody has to remember to check. The cookie is `HttpOnly`, `SameSite=Strict`
+  and `Secure` whenever the origin is https, so it still works on `http://localhost`.
+- **Nothing links to it.** No nav entry, not in the sitemap, `Disallow: /admin` in `robots.txt`, and
+  every response is `no-store` with `X-Robots-Tag: noindex`. A test walks every public page and
+  fails if the string `/admin` appears in any of them.
+- **The sign-in page** is chrome-less — `PageMeta` gained a `chrome` flag so the masthead and footer
+  can be dropped — with pseudo-code scrolling on a canvas behind the panel. The lines are assembled
+  in the browser from a token set, so no real source is served to an unauthenticated page. It stops
+  the moment the password field takes focus: text moving behind what you are typing into stops being
+  charming the second it costs somebody an attempt.
+- **The dashboard** shows the enquiries with counts, states and the message in full, and edits
+  exactly four fields: email, phone, the `sms:` link and its note. Everything else stays in version
+  control where the tests guard it, and KV is an override layer — an empty database renders the
+  committed site exactly.
+- **Deleting is two steps, done on the server.** The first press asks; the second deletes. An inline
+  `onclick="return confirm(…)"` would have been blocked by the policy — there is no `unsafe-inline`
+  — so the confirmation would silently never appear and the delete would go straight through. The
+  server-side version also works with JavaScript off. Deletion leaves a tombstone at
+  `["deleted", …]` holding when and who from, so a lost lead leaves a trace and a stolen session
+  cannot erase quietly.
+- **The trap that came with editable contact details.** They live inside the JSON-LD, and the
+  JSON-LD is admitted by the Content-Security-Policy through its hash — computed once at startup.
+  Changing the phone number would have left the emitted graph unmatched by the policy, so the
+  browser would block it: structured data gone from search results, and nothing to see but a console
+  message. `src/admin/contact.ts` now recomputes the details, the graph and its hash together on
+  every write; `RenderContext.jsonLd` and `SecurityOptions.scriptHashes` became getters over that
+  store rather than values frozen at boot. A test changes the number and re-runs the existing check
+  that every inline script the page emits is still admitted.
+
 ### A thesis with sources, and a reveal to carry it
 
 - **`/thesis`** — the argument the rest of the site rests on, in six sections: what changed as

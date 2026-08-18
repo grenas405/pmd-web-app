@@ -18,7 +18,7 @@ Requires [Deno](https://deno.com) 2.x. Nothing else — there is no `npm install
 
 ```sh
 deno task dev      # http://127.0.0.1:8002 with file watching
-deno task test     # 129 tests
+deno task test     # 140 tests
 deno task verify   # fmt --check, lint, type check, tests
 deno task e2e      # the checks that need a real browser
 ```
@@ -219,6 +219,11 @@ sudo systemctl daemon-reload && sudo systemctl enable --now pmd-web.service
 sudo systemd-analyze verify /etc/systemd/system/pmd-web.service
 journalctl -u pmd-web -f --output cat | jq .
 sudo -u pmdweb deno task inbox | jq .   # enquiries live in KV, owned by the service
+
+# Set or change the admin password. As the service user, deliberately: the unit
+# runs with UMask=0027, so the KV file is 0640 and owned by that account — you
+# can read the database and cannot write it.
+sudo -u pmdweb deno task admin-password
 ```
 
 ### Server hardening (nginx + fail2ban)
@@ -339,6 +344,7 @@ works:
   transcript is already in the HTML)
 - `splash.js` — opens the launch-offer dialog, once, to a visitor who is actually reading
 - `layers.js` — reveals the six-layer stack on the landing page (the diagram is already in the HTML)
+- `coderain.js` — the scrolling pseudo-code behind the admin sign-in, and nowhere else
 
 `sky.js` — the gold shooting stars — is dynamically imported during idle time, and never at all when
 the visitor prefers reduced motion.
@@ -391,6 +397,32 @@ open, and `inert` still applies to a top-layer dialog nested beneath it.
 Accessibility and motion: one `<h1>`, no heading-level jumps, labels bound to every input, a skip
 link, visible focus rings, and `prefers-reduced-motion: reduce` honoured by both the CSS and the
 scripts.
+
+### The admin area
+
+`/admin` is a sign-in page and `/admin/dashboard` is behind it. **Nothing links to either**, they
+are not in the sitemap, `robots.txt` disallows them and every response carries
+`X-Robots-Tag: noindex` and `Cache-Control: no-store`. That is housekeeping, not the control — the
+control is a session check on every route and an `Origin` check on every write.
+
+The password is set from the command line, never through a form:
+`sudo -u pmdweb deno task
+admin-password`. It is stored as PBKDF2-HMAC-SHA256 at 210,000 iterations
+with a random salt, using Web Crypto — no new dependency — and compared in constant time. Failed
+attempts are counted **in KV, not in memory**: the in-memory limiter used by the contact form resets
+on every restart, which would hand an attacker a fresh budget of guesses with every deploy.
+
+The dashboard reads the enquiries and edits exactly four fields: email, phone, the `sms:` link and
+the note beside it. Everything else — copy, prices, case studies, every cited figure — stays in
+version control where the tests guard it. KV is an override layer, so an empty database renders the
+committed site exactly.
+
+Those four fields carry a trap worth knowing about. They appear inside the JSON-LD, and the JSON-LD
+is admitted by the Content-Security-Policy through its SHA-256. Change the phone number and the
+emitted graph no longer matches the hash in the header, so the browser blocks it: structured data
+disappears from search results and the only symptom is a console message. `src/admin/contact.ts`
+therefore recomputes the details, the graph and its hash together on every write, and a test changes
+the number and then re-checks that every inline script the page emits is still admitted.
 
 ### Browser tests
 

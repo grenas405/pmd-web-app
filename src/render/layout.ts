@@ -18,6 +18,11 @@ export interface PageMeta {
   readonly path: string;
   /** Emit JSON-LD and the ambient background. Off for error pages. */
   readonly full?: boolean;
+  /**
+   * Draw the masthead and footer. Off for the admin login, which is a door
+   * rather than a page and should offer nothing to navigate to.
+   */
+  readonly chrome?: boolean;
 }
 
 function head(context: RenderContext, meta: PageMeta): Html {
@@ -181,8 +186,9 @@ function footer(context: RenderContext): Html {
           One paradigm shift in web development — built in ${site.locality}.
         </p>
         <ul class="footer__links">
-          <li><a href="${site.phoneHref}">${site.phone}</a> <span>(${site.phoneNote})</span></li>
-          <li><a href="mailto:${site.email}">${site.email}</a></li>
+          <li><a href="${context.contact.phoneHref}">${context.contact.phone}</a> <span>(${context
+            .contact.phoneNote})</span></li>
+          <li><a href="mailto:${context.contact.email}">${context.contact.email}</a></li>
           <li>
             <a href="${site.github}" rel="me noopener noreferrer" target="_blank">GitHub</a>
           </li>
@@ -228,10 +234,10 @@ export function layout(
       <body>
       <a class="skip-link" href="#main">Skip to content</a>
       ${meta.full === false ? null : sky()}
-      ${header()}
+      ${meta.chrome === false ? null : header()}
       <main id="main">${main}</main>
       ${overlay}
-      ${footer(context)}
+      ${meta.chrome === false ? null : footer(context)}
       <script type="module" src="${context.asset("/js/main.js")}"></script>
       </body>
     </html>

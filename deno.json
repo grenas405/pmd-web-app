@@ -7,6 +7,7 @@
     "start": "deno run --unstable-kv --allow-net=127.0.0.1 --allow-read=static,var --allow-write=var --allow-env main.ts",
     "test": "deno test --unstable-kv --allow-read=static,var --allow-write=var --allow-env --allow-net=127.0.0.1 tests/",
     "e2e": "deno test -A --unstable-kv --node-modules-dir=auto e2e/site_e2e.ts",
+    "admin-password": "deno run --unstable-kv --allow-read=var --allow-write=var --allow-env scripts/admin-password.ts",
     "inbox": "deno run --unstable-kv --allow-read=var --allow-write=var --allow-env scripts/inbox.ts",
     "check": "deno check main.ts src/**/*.ts tests/**/*.ts",
     "lint": "deno lint",

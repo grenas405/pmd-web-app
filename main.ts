@@ -13,8 +13,7 @@ import { createLogger } from "./src/log.ts";
 import { indexAssets } from "./src/http/assets.ts";
 import type { SecurityOptions } from "./src/http/security.ts";
 import { createApp } from "./src/app.ts";
-import { inlineScriptHashes } from "./src/render/layout.ts";
-import { structuredData } from "./src/content/site.ts";
+import { createContactStore } from "./src/admin/contact.ts";
 import type { RenderContext } from "./src/render/context.ts";
 
 export async function start(): Promise<Deno.HttpServer> {
@@ -30,21 +29,31 @@ export async function start(): Promise<Deno.HttpServer> {
   // has.
   const kv = await Deno.openKv(config.kvPath);
 
-  const jsonLd = structuredData(config.origin);
-  // The hashes come from the module that emits the scripts, so the policy and
-  // the page cannot drift. Still no 'unsafe-inline' and no nonce.
+  // Owns the contact details, the JSON-LD they appear in, and that graph's
+  // hash — all three recomputed together whenever the admin edits them.
+  const contact = await createContactStore(kv, config.origin);
+
+  // Getters, not values: editing the contact details changes the graph, and the
+  // policy has to admit the graph that is actually emitted.
   const security: SecurityOptions = {
     hsts: config.hsts,
-    scriptHashes: await inlineScriptHashes(jsonLd),
+    get scriptHashes() {
+      return contact.scriptHashes();
+    },
   };
 
   const render: RenderContext = {
     origin: config.origin,
     asset: assets.url,
-    jsonLd,
+    get jsonLd() {
+      return contact.jsonLd();
+    },
+    get contact() {
+      return contact.current();
+    },
   };
 
-  const app = createApp({ config, logger, render, security, startedAt, kv });
+  const app = createApp({ config, logger, render, security, startedAt, kv, contact });
 
   const server = Deno.serve({
     port: config.port,

@@ -13,6 +13,7 @@ export function robotsTxt(origin: string): string {
     "User-agent: *",
     "Allow: /",
     "Disallow: /api/",
+    "Disallow: /admin",
     "",
     `Sitemap: ${new URL("/sitemap.xml", origin).toString()}`,
     "",

@@ -2177,6 +2177,336 @@ main {
   }
 }
 
+/* ------------------------------------------------------------------ admin - */
+
+/* The sign-in door: one panel, one field, code drifting behind it. */
+.signin {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: var(--gutter);
+}
+
+.signin__rain {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.signin__panel {
+  position: relative;
+  width: min(24rem, 100%);
+  padding: clamp(1.5rem, 5vw, 2.25rem);
+  background: linear-gradient(165deg, var(--navy-700), var(--navy-900));
+  border: 1px solid var(--edge-strong);
+  border-radius: 1rem;
+  box-shadow: 0 2rem 4rem rgba(0, 0, 0, 0.6);
+}
+
+.signin__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+.signin__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 12px 2px rgba(217, 178, 95, 0.55);
+}
+
+.signin__title {
+  margin-bottom: 1.5rem;
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 60;
+  font-size: 2rem;
+  font-weight: 600;
+}
+
+.signin__error {
+  margin-bottom: 1rem;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.875rem;
+  color: var(--gold-bright);
+  background: rgba(163, 128, 31, 0.14);
+  border: 1px solid var(--edge-strong);
+  border-radius: 0.4rem;
+}
+
+.signin__label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+.signin__input {
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  background: var(--navy-900);
+  border: 1px solid var(--edge);
+  border-radius: 0.4rem;
+  color: var(--text);
+  font-family: var(--font-mono);
+}
+
+.signin__submit {
+  width: 100%;
+  margin-top: 1.1rem;
+  justify-content: center;
+}
+
+/* The desk. */
+.admin {
+  max-width: 64rem;
+  margin-inline: auto;
+  padding: 1.5rem var(--gutter) 4rem;
+}
+
+.admin__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 1.25rem;
+  margin-bottom: 2rem;
+  border-bottom: var(--rule);
+}
+
+.admin__brand {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.admin__brand span {
+  color: var(--text-mute);
+}
+
+.admin__signout {
+  padding: 0.4rem 0.8rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-mute);
+  background: none;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.admin__signout:hover {
+  color: var(--gold-bright);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+}
+
+.stat {
+  padding: 1rem 1.1rem;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 0.5rem;
+}
+
+.stat__value {
+  display: block;
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 48;
+  font-size: 1.9rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--gold);
+}
+
+.stat__label {
+  display: block;
+  margin-top: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+.adminpanel {
+  margin-bottom: 2.5rem;
+}
+
+.adminpanel__title {
+  margin-bottom: 0.6rem;
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 24;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.adminpanel__note {
+  max-width: 68ch;
+  margin-bottom: 1.25rem;
+  font-size: 0.9375rem;
+  color: var(--text-mute);
+}
+
+.leads {
+  display: grid;
+  gap: 1rem;
+}
+
+.lead {
+  padding: 1.1rem 1.25rem;
+  background: var(--navy-800);
+  border: 1px solid var(--edge-cool);
+  border-left: 3px solid var(--gold-deep);
+  border-radius: 0.5rem;
+}
+
+.lead--handled {
+  border-left-color: var(--edge-cool);
+  opacity: 0.72;
+}
+
+.lead__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.7rem;
+}
+
+.lead__name {
+  font-weight: 600;
+}
+
+.lead__co {
+  margin-left: 0.5rem;
+  font-weight: 400;
+  color: var(--text-mute);
+}
+
+.lead__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.2rem;
+  font-size: 0.8125rem;
+  color: var(--text-mute);
+}
+
+.lead__kind--pricing {
+  color: var(--gold);
+}
+
+.lead__plan {
+  font-family: var(--font-mono);
+}
+
+.lead__state {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+.lead__message {
+  max-width: 72ch;
+  margin-bottom: 0.9rem;
+  color: var(--text-soft);
+  white-space: pre-wrap;
+}
+
+.lead__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--edge-cool);
+}
+
+.lead__action {
+  padding: 0.35rem 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  background: none;
+  border: 1px solid var(--edge-cool);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.lead__action:hover {
+  border-color: var(--edge-strong);
+  color: var(--gold-bright);
+}
+
+.lead__action--danger:hover {
+  color: #ff9a8b;
+  border-color: rgba(255, 154, 139, 0.5);
+}
+
+.lead__confirm {
+  font-size: 0.8125rem;
+  color: var(--gold-bright);
+}
+
+.adminform {
+  display: grid;
+  gap: 1rem;
+  max-width: 34rem;
+}
+
+.adminfield {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.adminfield__label {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+.adminfield__input {
+  padding: 0.6rem 0.8rem;
+  background: var(--navy-900);
+  border: 1px solid var(--edge);
+  border-radius: 0.4rem;
+  color: var(--text);
+}
+
+.adminfield__default {
+  font-size: 0.75rem;
+  color: var(--text-mute);
+}
+
+.adminform__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
 /* ------------------------------------------------------------------ promo - */
 
 .promo {

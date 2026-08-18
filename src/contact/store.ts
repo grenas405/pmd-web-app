@@ -28,6 +28,8 @@ export interface InquiryRecord {
   readonly plan: string | null;
   /** Coarse client identifier, kept for abuse investigation only. */
   readonly source: string;
+  /** Set by the admin area. Older records have none and read as "open". */
+  readonly state?: "open" | "handled" | "archived";
 }
 
 /** Build the stored record. Pure, so the format can be asserted in tests. */
@@ -70,10 +72,64 @@ export async function saveInquiry(
   await kv.set(inquiryKey(record, id), record);
 }
 
+/** Where an enquiry has got to. Absent on older records, which read as open. */
+export type InquiryState = "open" | "handled" | "archived";
+
+/** Move one enquiry between states. Nothing is lost; the record is rewritten. */
+export async function markInquiry(
+  kv: Deno.Kv,
+  id: string,
+  state: InquiryState,
+): Promise<boolean> {
+  for await (const entry of kv.list<InquiryRecord>({ prefix: ["inquiry"] })) {
+    if (entry.key[2] !== id) continue;
+    await kv.set(entry.key, { ...entry.value, state });
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Remove one enquiry, leaving a tombstone.
+ *
+ * Deletion is permanent by request, but it is not silent: enough of the record
+ * survives at ["deleted", …] to know a lead existed and who it was from. A
+ * stolen session can destroy the message; it cannot make the fact disappear.
+ */
+export async function deleteInquiry(kv: Deno.Kv, id: string): Promise<boolean> {
+  for await (const entry of kv.list<InquiryRecord>({ prefix: ["inquiry"] })) {
+    if (entry.key[2] !== id) continue;
+    const { name, email, receivedAt, kind } = entry.value;
+    await kv.set(["deleted", new Date().toISOString(), id], {
+      name,
+      email,
+      receivedAt,
+      kind,
+      deletedAt: new Date().toISOString(),
+    });
+    await kv.delete(entry.key);
+    return true;
+  }
+  return false;
+}
+
 /** Most recent enquiries first. Used by `deno task inbox`. */
 export async function recentInquiries(kv: Deno.Kv, limit = 50): Promise<InquiryRecord[]> {
   const found: InquiryRecord[] = [];
   const entries = kv.list<InquiryRecord>({ prefix: ["inquiry"] }, { reverse: true, limit });
   for await (const entry of entries) found.push(entry.value);
+  return found;
+}
+
+/** The same list with each record's id, which the admin area acts on. */
+export async function recentWithIds(
+  kv: Deno.Kv,
+  limit = 200,
+): Promise<Array<{ id: string; record: InquiryRecord }>> {
+  const found: Array<{ id: string; record: InquiryRecord }> = [];
+  const entries = kv.list<InquiryRecord>({ prefix: ["inquiry"] }, { reverse: true, limit });
+  for await (const entry of entries) {
+    found.push({ id: String(entry.key[2]), record: entry.value });
+  }
   return found;
 }

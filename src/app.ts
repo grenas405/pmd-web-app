@@ -27,6 +27,8 @@ import { renderError, renderNotFound, renderThanks } from "./pages/simple.ts";
 import { IDLE_FORM } from "./routes/contact_state.ts";
 import { renderPricing } from "./pages/pricing.ts";
 import { renderThesis } from "./pages/thesis.ts";
+import type { ContactStore } from "./admin/contact.ts";
+import { adminRoutes } from "./routes/admin.ts";
 import { PLAN_ID, type PlanId } from "./content/pricing.ts";
 
 /** The plan named in `?plan=`, if we offer it. Anything else is ignored. */
@@ -43,6 +45,7 @@ export interface AppDeps {
   readonly security: SecurityOptions;
   readonly startedAt: Date;
   readonly kv: Deno.Kv;
+  readonly contact: ContactStore;
 }
 
 function buildRoutes(deps: AppDeps): readonly Route[] {
@@ -118,6 +121,17 @@ function buildRoutes(deps: AppDeps): readonly Route[] {
         })
       ),
     ),
+
+    // Unlinked, unindexed, and not in the sitemap. The door is still bolted:
+    // every route below the login checks the session, and robots.txt disallows
+    // the lot. See src/routes/admin.ts.
+    ...adminRoutes({
+      config: deps.config,
+      logger: deps.logger,
+      kv: deps.kv,
+      contact: deps.contact,
+      render: deps.render,
+    }),
 
     // Liveness only: no version, no build hash, no dependency status. A health
     // endpoint that describes the system is a reconnaissance endpoint.

@@ -13,7 +13,6 @@ import { parseConfig } from "../src/config.ts";
 import { silentLogger } from "../src/log.ts";
 import { scriptHash } from "../src/http/security.ts";
 import { escapeHtml } from "../src/render/html.ts";
-import { inlineScriptHashes } from "../src/render/layout.ts";
 import { nav } from "../src/content/site.ts";
 import { faq } from "../src/content/faq.ts";
 import { comparison, plan, PLAN_ID, sources, splash } from "../src/content/pricing.ts";
@@ -26,7 +25,7 @@ import {
   QUOTE_SECOND_CLAUSE,
   sources as thesisSources,
 } from "../src/content/thesis.ts";
-import { structuredData } from "../src/content/site.ts";
+import { createContactStore } from "../src/admin/contact.ts";
 
 const ORIGIN = "https://pedromdominguez.dev";
 
@@ -41,14 +40,31 @@ async function buildApp(overrides: Record<string, string> = {}) {
     INBOX_PATH: `var/test/${crypto.randomUUID()}.jsonl`,
     ...overrides,
   });
-  const jsonLd = structuredData(config.origin);
+  // The real store, so the JSON-LD and the policy hash it admits stay tied
+  // together here exactly as they do in main.ts.
+  const contact = await createContactStore(kv, config.origin);
   return createApp({
     config,
     logger: silentLogger,
-    render: { origin: config.origin, asset: (path) => `/static${path}`, jsonLd },
-    security: { hsts: config.hsts, scriptHashes: await inlineScriptHashes(jsonLd) },
+    render: {
+      origin: config.origin,
+      asset: (path) => `/static${path}`,
+      get jsonLd() {
+        return contact.jsonLd();
+      },
+      get contact() {
+        return contact.current();
+      },
+    },
+    security: {
+      hsts: config.hsts,
+      get scriptHashes() {
+        return contact.scriptHashes();
+      },
+    },
     startedAt: new Date("2026-01-01T00:00:00Z"),
     kv,
+    contact,
   });
 }
 
@@ -61,16 +77,31 @@ async function buildAppWithKv(overrides: Record<string, string> = {}) {
     INBOX_PATH: `var/test/${crypto.randomUUID()}.jsonl`,
     ...overrides,
   });
-  const jsonLd = structuredData(config.origin);
+  const contact = await createContactStore(kv, config.origin);
   const app = createApp({
     config,
     logger: silentLogger,
-    render: { origin: config.origin, asset: (path) => `/static${path}`, jsonLd },
-    security: { hsts: config.hsts, scriptHashes: await inlineScriptHashes(jsonLd) },
+    render: {
+      origin: config.origin,
+      asset: (path) => `/static${path}`,
+      get jsonLd() {
+        return contact.jsonLd();
+      },
+      get contact() {
+        return contact.current();
+      },
+    },
+    security: {
+      hsts: config.hsts,
+      get scriptHashes() {
+        return contact.scriptHashes();
+      },
+    },
     startedAt: new Date("2026-01-01T00:00:00Z"),
     kv,
+    contact,
   });
-  return { app, kv };
+  return { app, kv, contact };
 }
 
 const get = (path: string, init: RequestInit = {}) =>
@@ -543,4 +574,21 @@ Deno.test("the layer stack is served finished, not assembled by script", async (
     layers.length,
     "the stack is not fully rendered server-side",
   );
+});
+
+Deno.test("the admin area is not linked, listed or indexed", async () => {
+  const app = await buildApp();
+
+  // Nothing on the public site points at it. Obscurity is not the control —
+  // the session check is — but an unlinked door is not an invitation either.
+  for (const path of ["/", "/thesis", "/pricing", "/thank-you"]) {
+    const body = await (await app(get(path), "203.0.113.1")).text();
+    assert(!body.includes("/admin"), `${path} links to the admin area`);
+  }
+
+  const sitemap = await (await app(get("/sitemap.xml"), "203.0.113.1")).text();
+  assert(!sitemap.includes("admin"), "the admin area is in the sitemap");
+
+  const robots = await (await app(get("/robots.txt"), "203.0.113.1")).text();
+  assertStringIncludes(robots, "Disallow: /admin");
 });

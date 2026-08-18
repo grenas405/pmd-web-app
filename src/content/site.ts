@@ -118,7 +118,27 @@ export function absoluteUrl(origin: string, path: string): string {
  * keep in step. The FAQ and the offer are the same business as the Person above
  * them, so one graph is also the more accurate description.
  */
-export function structuredData(origin: string): string {
+export interface ContactDetails {
+  readonly email: string;
+  readonly phone: string;
+  readonly phoneHref: string;
+  readonly phoneNote: string;
+}
+
+/** The committed contact details. The admin area may override these in KV. */
+export const defaultContact: ContactDetails = {
+  email: site.email,
+  phone: site.phone,
+  phoneHref: site.phoneHref,
+  phoneNote: site.phoneNote,
+};
+
+/**
+ * @param contact Overridden contact details, when the admin has set any. They
+ * appear inside this graph, which is why changing them has to recompute the
+ * script hash in the Content-Security-Policy — see src/admin/contact.ts.
+ */
+export function structuredData(origin: string, contact: ContactDetails = defaultContact): string {
   return JSON.stringify({
     "@context": "https://schema.org",
     "@graph": [
@@ -127,8 +147,8 @@ export function structuredData(origin: string): string {
         "@id": `${origin}/#pedro`,
         name: site.name,
         url: origin,
-        email: `mailto:${site.email}`,
-        telephone: site.phone,
+        email: `mailto:${contact.email}`,
+        telephone: contact.phone,
         jobTitle: "Software Engineer",
         sameAs: [site.github],
         address: {
@@ -165,8 +185,8 @@ export function structuredData(origin: string): string {
         contactPoint: {
           "@type": "ContactPoint",
           contactType: "text message",
-          telephone: site.phone,
-          email: site.email,
+          telephone: contact.phone,
+          email: contact.email,
           areaServed: site.region,
           availableLanguage: "English",
         },

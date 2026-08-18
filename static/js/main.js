@@ -13,6 +13,7 @@ import { initContactForm } from "./contact.js";
 import { initSession } from "./session.js";
 import { initSplash } from "./splash.js";
 import { initLayers } from "./layers.js";
+import { initCodeRain } from "./coderain.js";
 
 function attempt(name, start) {
   try {
@@ -35,6 +36,8 @@ attempt("splash", initSplash);
 // Waits for the stack to be on screen before importing Anime.js, so a visitor
 // who never scrolls that far never pays for it.
 attempt("layers", initLayers);
+// Only ever finds its canvas on the sign-in page; everywhere else it returns.
+attempt("code rain", initCodeRain);
 
 // The night sky is the heaviest enhancement and the least important, so it is
 // loaded on its own, after everything else, and only when it will be used.
