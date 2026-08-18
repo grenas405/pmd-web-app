@@ -220,10 +220,18 @@ sudo systemd-analyze verify /etc/systemd/system/pmd-web.service
 journalctl -u pmd-web -f --output cat | jq .
 sudo -u pmdweb deno task inbox | jq .   # enquiries live in KV, owned by the service
 
-# Set or change the admin password. As the service user, deliberately: the unit
-# runs with UMask=0027, so the KV file is 0640 and owned by that account — you
-# can read the database and cannot write it.
-sudo -u pmdweb deno task admin-password
+# Set or change the admin password. As root, and the reason is worth knowing:
+# the KV file is 0640 owned by pmdweb, so you cannot write it as yourself — but
+# `sudo -u pmdweb` fails too, because sudo does not change directory and pmdweb
+# cannot traverse your 0750 home to reach the checkout. That account is meant to
+# be unable to; the service only reaches the code through systemd's bind mounts.
+# DENO_DIR reuses the cache deploy.sh warmed, so this fetches nothing.
+sudo DENO_DIR=/var/cache/pmd-web/deno deno task admin-password
+
+# Then check nothing root-owned was left behind. SQLite's -wal/-shm sidecars are
+# removed when the script closes KV, but a crash could strand one, and the
+# service would not be able to write past it.
+ls -l var/
 ```
 
 ### Server hardening (nginx + fail2ban)

@@ -1,12 +1,22 @@
 /**
  * admin-password.ts — set or change the admin password.
  *
- *   sudo -u pmdweb deno task admin-password
+ *   sudo DENO_DIR=/var/cache/pmd-web/deno deno task admin-password
  *
- * As the service user, deliberately. The unit runs with UMask=0027, so the KV
- * file it created is 0640 and owned by that account: the checkout's owner can
- * read the database and cannot write it. Running this as yourself fails on a
- * permission error that looks like a bug and is not.
+ * As root, and both halves of that are deliberate.
+ *
+ * Not as yourself: the unit runs with UMask=0027, so the KV file it created is
+ * 0640 owned by the service account — readable, not writable.
+ *
+ * And not as the service account either, tempting as it looks. `sudo -u pmdweb`
+ * does not change directory, and that account cannot traverse a 0750 home
+ * directory to reach this checkout; it fails with "couldn't find deno.json",
+ * which looks like a missing file and is really a missing permission. It is
+ * meant to be unable to get in there — the running service only reaches the
+ * code through systemd's bind mounts.
+ *
+ * DENO_DIR points at the cache scripts/deploy.sh already warmed, so this
+ * fetches nothing over the network.
  *
  * Nothing secret is printed, and the password never reaches a shell argument
  * where it would land in history or in `ps`.
@@ -75,7 +85,10 @@ if (import.meta.main) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Could not set the password: ${message}`);
     if (message.includes("permission") || message.includes("readonly")) {
-      console.error("Try again as the service user:  sudo -u pmdweb deno task admin-password");
+      console.error(
+        "The KV file belongs to the service account. Try:\n" +
+          "  sudo DENO_DIR=/var/cache/pmd-web/deno deno task admin-password",
+      );
     }
     Deno.exit(1);
   } finally {
