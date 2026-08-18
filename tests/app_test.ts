@@ -18,6 +18,14 @@ import { nav } from "../src/content/site.ts";
 import { faq } from "../src/content/faq.ts";
 import { comparison, plan, PLAN_ID, sources, splash } from "../src/content/pricing.ts";
 import { recentInquiries } from "../src/contact/store.ts";
+import {
+  layers,
+  modelPriceDrop,
+  objections,
+  quote,
+  QUOTE_SECOND_CLAUSE,
+  sources as thesisSources,
+} from "../src/content/thesis.ts";
 import { structuredData } from "../src/content/site.ts";
 
 const ORIGIN = "https://pedromdominguez.dev";
@@ -486,4 +494,53 @@ Deno.test("the menu carries its own way out", async () => {
   assert(panel.length > 0, "could not find the nav panel");
   assertStringIncludes(panel, "data-nav-close");
   assertStringIncludes(panel, "Close menu");
+});
+
+Deno.test("the thesis page argues, cites, and answers itself", async () => {
+  const app = await buildApp();
+  const response = await app(get("/thesis"), "203.0.113.1");
+  assertEquals(response.status, 200);
+
+  const body = await response.text();
+
+  // The quotation, whole. This is the test that fails if a future edit crops
+  // it to the half that flatters the argument.
+  assertStringIncludes(body, escapeHtml(quote.text));
+  assertStringIncludes(body, escapeHtml(QUOTE_SECOND_CLAUSE));
+  assertStringIncludes(body, quote.speaker);
+
+  // Every figure carries its source with it.
+  assertStringIncludes(body, modelPriceDrop.label);
+  for (const source of thesisSources) assertStringIncludes(body, source.url);
+
+  // And the objections are actually on the page, not summarised away.
+  for (const entry of objections) assertStringIncludes(body, escapeHtml(entry.objection));
+});
+
+Deno.test("the landing page summarises the thesis and hands off to it", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  assertStringIncludes(body, 'href="/thesis"');
+  // The long argument lives in one place; the landing page must not grow a
+  // second copy of it.
+  assert(
+    !body.includes(escapeHtml(quote.text)),
+    "the full quotation is duplicated on the landing page",
+  );
+});
+
+Deno.test("the layer stack is served finished, not assembled by script", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  // Every layer and the final figure in the HTML: layers.js only replays what
+  // is already here, so a visitor without JavaScript gets the whole diagram.
+  for (const layer of layers) assertStringIncludes(body, escapeHtml(layer.name));
+  assertStringIncludes(body, modelPriceDrop.label);
+  assertEquals(
+    [...body.matchAll(/data-layer-name/g)].length,
+    layers.length,
+    "the stack is not fully rendered server-side",
+  );
 });

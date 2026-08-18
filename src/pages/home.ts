@@ -18,6 +18,7 @@ import { type Project, projects } from "../content/projects.ts";
 import { liveSites } from "../content/live.ts";
 import { faq } from "../content/faq.ts";
 import { headline, plan as pricing, PLAN_ID, type PlanId, splash } from "../content/pricing.ts";
+import { layers, modelPriceDrop } from "../content/thesis.ts";
 import {
   session,
   type SessionLine,
@@ -268,55 +269,85 @@ function pricingSplash(): Html {
   `;
 }
 
-/** "Who is Pedro?" — the manifesto, plus the architecture in one line. */
+/**
+ * The argument, in short. The long version, with its citations and its
+ * objections, is at /thesis — this is the version a business owner can read
+ * standing up, and the figure beside it is the argument rather than decoration.
+ */
 function thesis(): Html {
-  const pipeline = ["Internet", "Nginx", "Deno", "Your functions"];
   return html`
     <section class="section section--thesis" id="thesis" aria-labelledby="thesis-title">
       ${sectionLabel("01", "The thesis")}
       <div class="thesis__grid">
         <div class="thesis__body">
           <h2 class="section__title" id="thesis-title">
-            Software has been getting heavier. Yours does not have to.
+            The clever part got cheap. The part that is yours did not.
           </h2>
           <p class="prose">
-            I am Pedro M. Dominguez. I build business software in Oklahoma City, and I build it
-            deliberately small. Most of what makes modern web projects expensive is not the
-            problem being solved — it is the machinery bolted around it: build pipelines,
-            framework migrations, hundreds of transitive dependencies, and a team large enough to
-            keep all of it standing.
+            Running an AI model costs about ${modelPriceDrop.label} less than it did six years ago,
+            and no company holds a lead in it for long. When the clever part becomes cheap, the
+            valuable part becomes the part nobody else has: how your business actually works — your
+            customers, your prices, your schedule, the small decisions your staff make without
+            thinking.
           </p>
           <p class="prose">
-            Strip that away and something surprising happens. A single engineer with good tools
-            and AI assistance can deliver, secure and maintain real systems on a timeline that
-            used to require a firm. Not by cutting corners — by removing the parts that were
-            never load-bearing.
+            That is the layer a local business can own. For years owning it was out of reach,
+            because building anything custom cost tens of thousands of dollars, so everyone rented
+            software built for the average of ten thousand other businesses and shaped their work
+            around it. AI has changed what that costs.
           </p>
           <p class="prose">
-            This site is the argument and the evidence. It is a few hundred lines of TypeScript
-            on the Deno runtime, standard library only, no framework, served straight from a
-            single process. Read the source; it is the same way I build for clients.
+            So this is the offer, plainly: software built around how you already work, that you
+            own — the code, the data, the domain — rather than rent by the month from somebody who
+            can change the terms.
           </p>
+          <div class="promo__actions">
+            <a class="button button--solid" href="/thesis">Read the full argument ${arrowSvg()}</a>
+          </div>
         </div>
 
-        <figure class="pipeline" aria-labelledby="pipeline-caption">
-          <ol class="pipeline__list">
-            ${pipeline.map((stage, index) =>
-              html`
-                <li class="pipeline__stage">
-                  <span class="pipeline__number">${String(index + 1).padStart(2, "0")}</span>
-                  <span class="pipeline__name">${stage}</span>
-                </li>
-              `
-            )}
-          </ol>
-          <figcaption class="pipeline__caption" id="pipeline-caption">
-            The entire request path. Four hops, one process, no orchestration layer to operate at
-            two in the morning.
-          </figcaption>
-        </figure>
+        ${layerStack()}
       </div>
     </section>
+  `;
+}
+
+/**
+ * The six layers of the AI economy, bottom to top, with the one a business can
+ * own at the top of the stack.
+ *
+ * Served finished — every layer, the rail and the final figure are in this
+ * markup. `layers.js` hides those pieces and replays them; if it never runs,
+ * or Anime.js fails to load, or the visitor prefers reduced motion, what stays
+ * on screen is the completed diagram. The layers themselves come from the
+ * research cited on /thesis, not from imagination.
+ */
+function layerStack(): Html {
+  return html`
+    <figure class="layers" data-layers aria-labelledby="layers-caption">
+      <div class="layers__rail" data-layers-rail aria-hidden="true"></div>
+      <ol class="layers__list">
+        ${[...layers].reverse().map((layer) =>
+          html`
+            <li
+              class="layers__layer${layer.yours === true ? " layers__layer--yours" : ""}"
+              data-layer-name
+              ${layer.yours === true ? raw("data-layer-yours") : html``}
+            >
+              <span class="layers__name">${layer.name}</span>
+              <span class="layers__gloss">${layer.gloss}</span>
+              ${layer.yours === true ? html`<span class="layers__badge">Yours</span>` : html``}
+            </li>
+          `
+        )}
+      </ol>
+      <figcaption class="layers__caption" id="layers-caption">
+        Running a model costs
+        <span class="layers__figure" data-layers-count>${modelPriceDrop.label}</span>
+        less than it did six years ago. The value moves to the top of the stack — the only layer
+        your business can own.
+      </figcaption>
+    </figure>
   `;
 }
 

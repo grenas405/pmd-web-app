@@ -2,6 +2,59 @@
 
 ## Unreleased
 
+### A thesis with sources, and a reveal to carry it
+
+- **`/thesis`** — the argument the rest of the site rests on, in six sections: what changed as
+  models got cheap, renting versus owning, why cheap is not the same as worthless, what the
+  foundation is built on and why that is economic rather than technical, the objections, and the
+  sources. Written for a business owner; the terms the citations use are introduced once in plain
+  words and then the plain words do the work.
+- **The citation was verified against the transcript, and needed to be.** The tidied version
+  circulating in search results differs from what was said, and one outlet's headline attributes the
+  passage to a different host. What is on the page: Chamath Palihapitiya, All-In Podcast, 24 July
+  2026, around ten minutes in — _"The real business model is not in the foundational model anymore.
+  It's at the application layer above and it's in the infrastructure below, whether that's the cloud
+  or whether that's chips."_ No episode number appears anywhere, because two sources disagree about
+  it.
+- **The quotation is used whole, and a test enforces that.** It puts value at the application layer
+  _and_ in the infrastructure below. Cropping the second clause would make it say something the
+  speaker did not — and would throw away the evidence the "cheap is not worthless" section needs.
+  `tests/content_test.ts` and `tests/app_test.ts` both fail if that clause disappears.
+- The page also says plainly that the speaker is describing where investable value sits, **not**
+  arguing that a local business should own its software. That step is this site's own, and it is
+  made rather than borrowed.
+- **The objections section argues against the site in public.** Veracode put 100+ models through 80
+  coding tasks: 45% of the output carried a security flaw, and the pass rate has barely moved in two
+  years. That is on the page, answered with what this codebase actually does about it — and the
+  hardest objections ("who maintains it when you are gone?", "can a business our size carry this?")
+  are conceded rather than deflected. A test refuses an answer shorter than 80 characters.
+- Every figure names a source, and every source says what it supports. The SaaS-spend benchmark
+  carries an explicit caveat that "small business" in those surveys means firms far larger than a
+  roofer or a church.
+
+### The landing page argues economics now, not craft
+
+- Section 01 was a craft argument — software got heavy, mine is small. It is now the short version
+  of the economic one: the clever part got cheap, the part that is yours did not, and that is what
+  makes owning software affordable. The long version, with citations, is one link away.
+- **The six-layer stack, revealed.** `static/js/layers.js` builds the stack from the foundation
+  upward, sends a gold rail up through it, lands the one layer a business can own, and counts
+  `1,500×` up to exactly the cited figure. The order is the argument, which is why it runs
+  bottom-up.
+- Same contract as every other animation here: the diagram is **served finished** — every layer, the
+  rail and the final figure in the HTML — and `layers.js` hides those pieces to replay them. No
+  JavaScript, reduced motion, or a failed Anime.js import all leave the completed diagram on screen.
+  Anime.js is imported on first sight of the figure, so a visitor who never scrolls that far never
+  pays the 42 KB.
+- The layers are the six from the cited research, not invented to suit the picture, and a test holds
+  the count and the single "yours" flag so the diagram cannot drift from the source it illustrates.
+- The pipeline figure moved to `/thesis`, where the technical foundation is actually the subject. It
+  describes a request path, and section 01 is no longer about request paths.
+- The browser suite gained a step that scrolls to the stack, waits for the reveal to **start and
+  finish**, and asserts the counter landed on `1,500×` with no layer left faded. Waiting only for
+  "not playing" passed instantly at page load — before the animation began — which is precisely the
+  state it was meant to catch.
+
 ### A menu worth opening
 
 - The hamburger now opens a **full-screen menu**: the five sections numbered and set in the display

@@ -60,39 +60,45 @@ export const site = {
  */
 export const nav: readonly NavLink[] = [
   {
+    href: "/thesis",
+    label: "Thesis",
+    index: "01",
+    description: "Why you can own this now",
+  },
+  {
     href: "/#approach",
     label: "Approach",
-    index: "01",
+    index: "02",
     description: "How the work gets done",
   },
   {
     href: "/#work",
     label: "Work",
-    index: "02",
+    index: "03",
     description: "Sites running right now",
   },
   {
     href: "/#advantage",
     label: "Advantage",
-    index: "03",
+    index: "04",
     description: "Why one person, not a firm",
   },
   {
     href: "/#process",
     label: "Process",
-    index: "04",
+    index: "05",
     description: "From counter to launch",
   },
   {
     href: "/pricing",
     label: "Pricing",
-    index: "05",
+    index: "06",
     description: "What it costs, in full",
   },
   {
     href: "/#contact",
     label: "Contact",
-    index: "06",
+    index: "07",
     description: "Start a project",
   },
 ];

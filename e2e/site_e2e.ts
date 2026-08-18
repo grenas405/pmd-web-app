@@ -266,12 +266,47 @@ Deno.test("the site behaves in a browser", async (t) => {
       });
     });
 
+    await t.step("the layer stack finishes its reveal", async () => {
+      await withPage(harness, TABLET, async (page) => {
+        await page.goto(`${harness.origin}/`);
+        await page.locator("[data-layers]").scrollIntoViewIfNeeded();
+
+        // Wait for the reveal to start and then to finish. Waiting only for
+        // "not playing" would pass instantly at page load, before the
+        // animation had begun — which is exactly the state this is meant to
+        // catch, so the test has to see the attribute arrive first.
+        await page.waitForSelector("[data-layers][data-layers-playing]", { timeout: 15000 });
+        await page.waitForFunction(
+          () =>
+            document.querySelector("[data-layers]")?.hasAttribute("data-layers-playing") === false,
+          undefined,
+          { timeout: 15000 },
+        );
+
+        assert(
+          await page.locator("[data-layer-yours]").isVisible(),
+          "the layer the business owns is not visible once the reveal is done",
+        );
+
+        // The counter must land on the cited figure, not on a rounded frame of
+        // the count-up it happened to stop in.
+        const counted = await page.locator("[data-layers-count]").textContent();
+        assertEquals(counted?.trim(), "1,500×", "the counter did not finish on the cited figure");
+
+        const opacity = await page.evaluate(() =>
+          [...document.querySelectorAll("[data-layer-name]")]
+            .map((el) => Number(getComputedStyle(el).opacity))
+        );
+        assert(opacity.every((value) => value > 0.95), `a layer was left faded: ${opacity}`);
+      });
+    });
+
     for (
       const [name, viewport] of [["phone", PHONE], ["tablet", TABLET], ["laptop", LAPTOP]] as const
     ) {
       await t.step(`nothing scrolls sideways (${name})`, async () => {
         await withPage(harness, viewport, async (page) => {
-          for (const path of ["/", "/pricing"]) {
+          for (const path of ["/", "/thesis", "/pricing"]) {
             await page.goto(`${harness.origin}${path}`);
             const overflow = await page.evaluate(() =>
               document.documentElement.scrollWidth - globalThis.innerWidth

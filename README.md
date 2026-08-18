@@ -18,7 +18,7 @@ Requires [Deno](https://deno.com) 2.x. Nothing else — there is no `npm install
 
 ```sh
 deno task dev      # http://127.0.0.1:8002 with file watching
-deno task test     # 122 tests
+deno task test     # 129 tests
 deno task verify   # fmt --check, lint, type check, tests
 deno task e2e      # the checks that need a real browser
 ```
@@ -53,7 +53,7 @@ touches the environment.
 | `src/render/html.ts`    | The `html` tagged template that escapes by default                          |
 | `src/render/layout.ts`  | Document shell: head, masthead, footer, sky                                 |
 | `src/pages/*.ts`        | Page composition. Pure functions of (context, data)                         |
-| `src/content/*.ts`      | Copy, portfolio, the hero session and the live-site roster, as plain data   |
+| `src/content/*.ts`      | Copy, portfolio, pricing, the thesis and its sources — all as plain data    |
 | `src/contact/*.ts`      | Contact schema (pure) and the enquiry store (the only writer)               |
 | `static/`               | CSS, ES modules, images, vendored font and Anime.js                         |
 | `systemd/`              | The unit and its optional environment file                                  |
@@ -338,6 +338,7 @@ works:
 - `session.js` — replays the hero's Claude Code session, rotating through three clients (the first
   transcript is already in the HTML)
 - `splash.js` — opens the launch-offer dialog, once, to a visitor who is actually reading
+- `layers.js` — reveals the six-layer stack on the landing page (the diagram is already in the HTML)
 
 `sky.js` — the gold shooting stars — is dynamically imported during idle time, and never at all when
 the visitor prefers reduced motion.

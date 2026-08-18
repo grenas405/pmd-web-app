@@ -4,9 +4,16 @@
  * cannot leave the page rendering a blank row or a broken link.
  */
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { liveSites } from "../src/content/live.ts";
 import { projects } from "../src/content/projects.ts";
+import {
+  layers,
+  objections,
+  quote,
+  QUOTE_SECOND_CLAUSE,
+  sources as thesisSources,
+} from "../src/content/thesis.ts";
 import { faq } from "../src/content/faq.ts";
 import { comparison, included, notIncluded, plan, sources } from "../src/content/pricing.ts";
 import { nav } from "../src/content/site.ts";
@@ -218,5 +225,53 @@ Deno.test("every case study links to a site we actually run", () => {
       hosts.has(url.hostname),
       `${project.name} links to ${url.hostname}, which is not on the roster in live.ts`,
     );
+  }
+});
+
+Deno.test("the thesis quotation keeps the clause that would be cropped", () => {
+  // It places value at the application layer AND in the infrastructure below.
+  // Dropping the second half would make it say something the speaker did not,
+  // and would throw away what the "cheap is not worthless" section rests on.
+  assertStringIncludes(quote.text, QUOTE_SECOND_CLAUSE);
+  assertEquals(quote.speaker, "Chamath Palihapitiya");
+  assertStringIncludes(quote.where, "2026");
+  assert(quote.source >= 0 && quote.source < thesisSources.length);
+});
+
+Deno.test("every thesis source is reachable and says what it supports", () => {
+  assert(thesisSources.length > 0);
+  for (const source of thesisSources) {
+    assert(source.url.startsWith("https://"), `${source.label} is not an https source`);
+    assert(source.note.trim().length > 0, `${source.label} does not say what it supports`);
+    assert(source.label.trim().length > 0);
+  }
+});
+
+Deno.test("every objection is answered, and cited answers name a real source", () => {
+  assert(objections.length >= 6, "an objections section this short is a dodge");
+  for (const entry of objections) {
+    assert(entry.objection.trim().length > 0);
+    // A one-line brush-off is worse than not raising the objection at all.
+    assert(entry.answer.trim().length > 80, `${entry.objection} gets a stub for an answer`);
+    if (entry.source !== undefined) {
+      assert(
+        entry.source >= 0 && entry.source < thesisSources.length,
+        `${entry.objection} cites source ${entry.source}, which does not exist`,
+      );
+    }
+  }
+});
+
+Deno.test("the layer stack matches the map it illustrates", () => {
+  // Six layers, from the cited research — not invented to suit the diagram.
+  assertEquals(layers.length, 6);
+  assertEquals(layers.filter((layer) => layer.yours === true).length, 1);
+
+  // The one a business can own is the top of the stack, which is what the
+  // whole argument turns on.
+  assertEquals(layers[layers.length - 1]?.yours, true);
+  for (const layer of layers) {
+    assert(layer.name.trim().length > 0);
+    assert(layer.gloss.trim().length > 0);
   }
 });

@@ -26,6 +26,7 @@ import { renderHome } from "./pages/home.ts";
 import { renderError, renderNotFound, renderThanks } from "./pages/simple.ts";
 import { IDLE_FORM } from "./routes/contact_state.ts";
 import { renderPricing } from "./pages/pricing.ts";
+import { renderThesis } from "./pages/thesis.ts";
 import { PLAN_ID, type PlanId } from "./content/pricing.ts";
 
 /** The plan named in `?plan=`, if we offer it. Anything else is ignored. */
@@ -67,6 +68,11 @@ function buildRoutes(deps: AppDeps): readonly Route[] {
         // string, so the hidden field survives with JavaScript switched off.
         renderHome(deps.render, IDLE_FORM, planFromQuery(url)),
       )),
+    route(
+      "GET",
+      "/thesis",
+      page(() => htmlResponse(renderThesis(deps.render), { cacheControl: CACHE_PAGE })),
+    ),
     route(
       "GET",
       "/pricing",
