@@ -265,7 +265,8 @@ select {
  * header while a full-screen menu is covering it.
  */
 .masthead[data-menu-open] {
-  /* bug reintroduced on purpose */
+  backdrop-filter: none;
+  transition: none;
 }
 
 .masthead__mark {

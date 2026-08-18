@@ -171,6 +171,19 @@ Deno.test("the site behaves in a browser", async (t) => {
             box.height > viewport.height * 0.9,
             `the menu is ${Math.round(box.height)}px tall in a ${viewport.height}px viewport`,
           );
+
+          // The layout box is not the whole story: clip-path shrinks what is
+          // painted without touching it, so ask the browser what is actually
+          // at the bottom of the screen. A panel clipped to a strip fails here
+          // while still measuring full height.
+          assert(
+            await page.evaluate(() =>
+              document.querySelector("#site-nav")?.contains(
+                document.elementFromPoint(globalThis.innerWidth / 2, globalThis.innerHeight - 40),
+              ) === true
+            ),
+            "the bottom of the screen is not covered by the menu",
+          );
         });
       });
     }

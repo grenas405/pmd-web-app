@@ -50,6 +50,16 @@
 
 ### Browser tests, because every bug here has been a rendering bug
 
+- The `data-menu-open` rule shipped in 645f8d4 with its body replaced by a comment — a deliberate
+  mutation, made to prove the browser test could detect the bug, that was committed by mistake
+  instead of being reverted. The menu was therefore still opening as a strip on the live site. The
+  rule is restored. The incident did establish what the mutation was meant to: the broken stylesheet
+  produced a 144px panel against an assertion of "more than 921px", so `deno task e2e` catches it —
+  it simply was not re-run before committing.
+- The menu check now also asks the browser what is at the bottom of the screen, not only how tall
+  the panel measures. `boundingBox()` reports the layout box, which `clip-path` shrinks without
+  touching, so a panel clipped to a strip could have measured full height and passed.
+
 - **`deno task e2e`** drives a real Chromium at 375, 768 and 1280 px: the menu fills the viewport
   after scrolling, the close button returns focus to the toggle, the masthead survives following a
   nav link, `/pricing`'s nav links land on the landing page, the laptop layout is a row with no
