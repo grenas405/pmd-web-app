@@ -38,23 +38,61 @@ function sectionLabel(index: string, text: string): Html {
   `;
 }
 
+/**
+ * The name, split into words of single letters so the reveal has something to
+ * stagger. Done on the server, not in the browser: every script on this page
+ * replays a finished document rather than assembling one, and a heading that
+ * only exists once JavaScript has run is a heading a crawler never sees.
+ *
+ * No whitespace between the spans — the array joins with nothing, and a newline
+ * here would open a gap inside every word. Pure.
+ */
+function splitLetters(text: string): Html {
+  return html`${
+    text.split(" ").map((word) =>
+      html`<span class="hero__word">${
+        [...word].map((letter) => html`<span class="hero__letter">${letter}</span>`)
+      }</span>`
+    )
+  }`;
+}
+
+/**
+ * The hero, built on the shape portfolio-app uses: the name, then a ladder of
+ * short lines that each answer one question a stranger has — what he does,
+ * where he is, what he has shipped, what it costs.
+ *
+ * Everything here is visible as served. `hero.js` hides pieces and brings them
+ * back; if it never runs the visitor gets the finished hero, which is the same
+ * contract session.js and layers.js keep.
+ */
 function hero(): Html {
+  const money = `$${pricing.build.toLocaleString("en-US")}`;
   return html`
     <section class="hero" aria-labelledby="hero-title">
+      <div class="hero__aurora" aria-hidden="true"></div>
+
       <p class="hero__eyebrow">
         <span class="hero__eyebrow-dot" aria-hidden="true"></span>
-        Oklahoma City · Independent Software Engineering
+        ${site.tagline}
       </p>
 
-      <h1 class="hero__title" id="hero-title">
-        <!-- Ordinary spaces, deliberately. Non-breaking ones made each line a
-            single unbreakable token, and at the hero's clamped size that is
-            wider than a phone: the tail of "Shift." fell off the right edge
-            and took the page's horizontal scroll with it. Each line is its
-            own block, so wrapping inside one is fine. -->
-        <span class="hero__line">One Person.</span>
-        <span class="hero__line hero__line--accent">One Paradigm Shift.</span>
+      <!-- aria-label so this is announced as a name rather than as eighteen
+          separate letters. The visible spans stay for the reveal. -->
+      <h1 class="hero__title" id="hero-title" aria-label="${site.name}">
+        ${splitLetters(site.name)}
       </h1>
+
+      <p class="hero__role">${site.role}</p>
+      <p class="hero__location">${site.location}</p>
+
+      <!-- Counted, never typed: the roster in the work section is the source of
+          truth, and a hardcoded number here would drift away from it. -->
+      <p class="hero__stats">
+        ${liveSites.length} live sites · 1 direct line · No middlemen · Oklahoma City
+      </p>
+
+      <div class="hero__divider" aria-hidden="true"></div>
 
       <p class="hero__rotator">
         <span class="hero__rotator-prefix">in</span>
@@ -66,16 +104,39 @@ function hero(): Html {
           .disciplines[0]}</span><span class="typewriter__caret" aria-hidden="true"></span></span>
       </p>
 
-      <p class="hero__lede">
-        I design, build, secure and maintain software for Oklahoma City businesses — the whole
-        job, by one engineer working with AI, at a pace that used to require an agency.
-      </p>
-
       <div class="hero__actions">
-        <a class="button button--solid" href="#contact">Start a project ${arrowSvg()}</a>
+        <a class="button button--solid" href="/pricing">Get your site built ${arrowSvg()}</a>
         <a class="button button--ghost" href="#work">See the work</a>
       </div>
 
+      <p class="hero__trust">
+        Serving OKC small businesses · From <strong>${money}</strong> · You own everything
+      </p>
+
+      <a class="hero__cue" href="#session">
+        <span>See how it is built</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 15.586L5.707 9.293 4.293 10.707 12 18.414l7.707-7.707-1.414-1.414z" />
+        </svg>
+      </a>
+    </section>
+  `;
+}
+
+/**
+ * The session, in a section of its own.
+ *
+ * It used to hang off the bottom of the hero and borrow its heading. Now that
+ * the hero fills the viewport it needs both its own room and its own title —
+ * and the hero's scroll cue needs somewhere real to land.
+ */
+function sessionSection(): Html {
+  return html`
+    <section class="section section--session" id="session" aria-labelledby="session-title">
+      ${sectionLabel("01", "How it is built")}
+      <h2 class="section__title" id="session-title">
+        What building your site actually looks like.
+      </h2>
       ${sessionFigure()}
     </section>
   `;
@@ -145,7 +206,7 @@ function pricingPromo(): Html {
   const money = (amount: number) => `$${amount.toLocaleString("en-US")}`;
   return html`
     <section class="section section--promo" id="pricing" aria-labelledby="promo-title">
-      ${sectionLabel("06", "What it costs")}
+      ${sectionLabel("07", "What it costs")}
       <div class="promo">
         <div class="promo__body">
           <h2 class="section__title" id="promo-title">
@@ -197,7 +258,7 @@ function pricingPromo(): Html {
 function faqSection(): Html {
   return html`
     <section class="section section--faq" id="faq" aria-labelledby="faq-title">
-      ${sectionLabel("08", "Common questions")}
+      ${sectionLabel("09", "Common questions")}
       <h2 class="section__title" id="faq-title">The things people ask before they text.</h2>
       <dl class="faq">
         ${faq.map((entry) =>
@@ -277,7 +338,7 @@ function pricingSplash(): Html {
 function thesis(): Html {
   return html`
     <section class="section section--thesis" id="thesis" aria-labelledby="thesis-title">
-      ${sectionLabel("01", "The thesis")}
+      ${sectionLabel("02", "The thesis")}
       <div class="thesis__grid">
         <div class="thesis__body">
           <h2 class="section__title" id="thesis-title">
@@ -355,7 +416,7 @@ function layerStack(): Html {
 function capabilitiesSection(): Html {
   return html`
     <section class="section" id="build" aria-labelledby="build-title">
-      ${sectionLabel("02", "What I build")}
+      ${sectionLabel("03", "What I build")}
       <h2 class="section__title" id="build-title">
         Practical systems for businesses that run on them.
       </h2>
@@ -377,7 +438,7 @@ function capabilitiesSection(): Html {
 function approachSection(): Html {
   return html`
     <section class="section section--approach" id="approach" aria-labelledby="approach-title">
-      ${sectionLabel("03", "Approach")}
+      ${sectionLabel("04", "Approach")}
       <h2 class="section__title" id="approach-title">
         Every engineering decision, translated into what it costs you or saves you.
       </h2>
@@ -400,7 +461,7 @@ function approachSection(): Html {
 function advantageSection(): Html {
   return html`
     <section class="section section--advantage" id="advantage" aria-labelledby="advantage-title">
-      ${sectionLabel("04", "The advantage")}
+      ${sectionLabel("05", "The advantage")}
       <h2 class="section__title" id="advantage-title">
         An agency has more people. That was only ever an advantage when software required more
         people.
@@ -506,7 +567,7 @@ function liveRoster(): Html {
 function workSection(): Html {
   return html`
     <section class="section section--work" id="work" aria-labelledby="work-title">
-      ${sectionLabel("05", "Selected work")}
+      ${sectionLabel("06", "Selected work")}
       <h2 class="section__title" id="work-title">
         Software for the businesses that keep this city running.
       </h2>
@@ -524,7 +585,7 @@ function workSection(): Html {
 function processSection(): Html {
   return html`
     <section class="section section--process" id="process" aria-labelledby="process-title">
-      ${sectionLabel("07", "Working together")}
+      ${sectionLabel("08", "Working together")}
       <h2 class="section__title" id="process-title">Four steps, no discovery-phase invoice.</h2>
       <ol class="steps">
         ${process.map((step) =>
@@ -564,7 +625,7 @@ function contactSection(state: ContactFormState, plan?: PlanId): Html {
 
   return html`
     <section class="section section--contact" id="contact" aria-labelledby="contact-title">
-      ${sectionLabel("09", "Start here")}
+      ${sectionLabel("10", "Start here")}
       <div class="contact__grid">
         <div class="contact__intro">
           <h2 class="section__title" id="contact-title">
@@ -709,6 +770,7 @@ export function renderHome(
 ): Html {
   const main = html`
     ${hero()}
+    ${sessionSection()}
     ${thesis()}
     ${capabilitiesSection()}
     ${approachSection()}

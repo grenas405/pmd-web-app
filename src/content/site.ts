@@ -22,7 +22,14 @@ export interface NavLink {
 
 export const site = {
   name: "Pedro M. Dominguez",
-  role: "Software Engineer · Oklahoma City",
+  /**
+   * The line under the name in the hero. Written as a customer would describe
+   * the job rather than as a CV would title it: somebody looking for this
+   * searches for a web developer, not for a software engineer.
+   */
+  role: "Web Developer for Oklahoma Businesses",
+  /** Spelled out, because "OKC" is not what a stranger types into a search. */
+  location: "Oklahoma City, Oklahoma · U.S.A.",
   domain: "pedromdominguez.dev",
   tagline: "One Person. One Paradigm Shift.",
   description:

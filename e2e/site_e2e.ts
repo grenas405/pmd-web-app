@@ -301,6 +301,45 @@ Deno.test("the site behaves in a browser", async (t) => {
       });
     });
 
+    await t.step("the name fits the narrowest phone, and finishes its reveal", async () => {
+      await withPage(harness, PHONE, async (page) => {
+        await page.goto(harness.origin);
+
+        // boundingBox() cannot see a clip, which is how the last hero shipped
+        // with its final letters cut off. Ask the document instead: every letter
+        // must sit inside the viewport it is being read in.
+        const spill = await page.evaluate(() => {
+          const letters = [...document.querySelectorAll(".hero__letter")];
+          return letters.reduce((worst, letter) => {
+            const box = letter.getBoundingClientRect();
+            return Math.max(worst, box.right - globalThis.innerWidth, -box.left);
+          }, 0);
+        });
+        assert(spill <= 1, `the name spills ${spill}px past the viewport at ${PHONE.width}px`);
+
+        // And it must end visible. The reveal hides the letters before it plays
+        // them back, so a reveal that stops halfway leaves the page headless.
+        //
+        // Waiting for the attribute to appear first is not ceremony: waiting
+        // only for it to be absent passes instantly at page load, before the
+        // reveal has begun, and asserts nothing at all.
+        await page.waitForFunction(
+          () => document.querySelector(".hero")?.hasAttribute("data-hero-playing"),
+          { timeout: 8000 },
+        );
+        await page.waitForFunction(
+          () => !document.querySelector(".hero")?.hasAttribute("data-hero-playing"),
+          { timeout: 8000 },
+        );
+        const faded = await page.evaluate(() =>
+          [...document.querySelectorAll(".hero__letter")]
+            .map((letter) => Number(globalThis.getComputedStyle(letter).opacity))
+            .filter((value) => value < 0.95).length
+        );
+        assertEquals(faded, 0, "letters were left faded out after the reveal");
+      });
+    });
+
     for (
       const [name, viewport] of [["phone", PHONE], ["tablet", TABLET], ["laptop", LAPTOP]] as const
     ) {

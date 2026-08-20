@@ -13,7 +13,7 @@ import { parseConfig } from "../src/config.ts";
 import { silentLogger } from "../src/log.ts";
 import { scriptHash } from "../src/http/security.ts";
 import { escapeHtml } from "../src/render/html.ts";
-import { nav } from "../src/content/site.ts";
+import { nav, site } from "../src/content/site.ts";
 import { faq } from "../src/content/faq.ts";
 import { comparison, plan, PLAN_ID, sources, splash } from "../src/content/pricing.ts";
 import { recentInquiries } from "../src/contact/store.ts";
@@ -131,19 +131,54 @@ Deno.test("the front page renders with the full security header set", async () =
   assertEquals(response.headers.get("x-content-type-options"), "nosniff");
 
   const body = await response.text();
-  assertStringIncludes(body, "One Person.");
-  assertStringIncludes(body, "One Paradigm Shift.");
+  // The tagline is the eyebrow now, not the heading, but it is still on the page.
+  assertStringIncludes(body, escapeHtml(site.tagline));
+});
+
+Deno.test("the h1 is the name, and it is announced as a name", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  // Split into letters for the reveal, so the name is not in the markup as one
+  // string — which is exactly why the aria-label has to be.
+  assertStringIncludes(body, `aria-label="${escapeHtml(site.name)}"`);
+  for (const letter of site.name.replace(/ /g, "")) {
+    assertStringIncludes(body, `<span class="hero__letter">${escapeHtml(letter)}</span>`);
+  }
 });
 
 Deno.test("the hero title can wrap on a narrow screen", async () => {
   const app = await buildApp();
   const body = await (await app(get("/"), "203.0.113.1")).text();
 
-  // A non-breaking space here makes the line one unbreakable token. At the
-  // hero's clamped size that is wider than a phone, so the end of the line
-  // hangs off the right edge and the page scrolls sideways to reach it.
-  assert(!body.includes("One&nbsp;Paradigm"), "the hero title cannot wrap on a narrow screen");
-  assert(!body.includes("One&nbsp;Person"), "the hero title cannot wrap on a narrow screen");
+  // A non-breaking space makes a line one unbreakable token. At the hero's
+  // clamped size that is wider than a phone, so the end of the line hangs off
+  // the right edge and the page scrolls sideways to reach it. The name is the
+  // live risk now — uppercase "DOMINGUEZ" is the longest word on the page.
+  const hero = body.slice(body.indexOf('class="hero"'), body.indexOf("</section>"));
+  assert(!hero.includes("&nbsp;"), "the hero cannot contain an unbreakable space");
+  assert(
+    !/<span class="hero__word">[^<]/.test(hero),
+    "a word must be letter spans, or the reveal has nothing to stagger",
+  );
+});
+
+Deno.test("the hero counts live sites rather than claiming a number", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  // A hardcoded figure drifts away from the roster the moment one is added.
+  assertStringIncludes(body, `${liveSites.length} live sites`);
+});
+
+Deno.test("the hero quotes the real price, once", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  const hero = body.slice(body.indexOf('class="hero"'), body.indexOf("</section>"));
+  assertStringIncludes(hero, `$${plan.build}`);
+  // portfolio-app says $275. Copying its hero must not copy its price.
+  assert(!hero.includes("$275"), "the hero is quoting another site's price");
 });
 
 Deno.test("the hero session is served finished, not assembled by script", async () => {

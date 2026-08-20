@@ -369,17 +369,18 @@ Content is data, kept apart from the code that renders it:
 
 ## Front end
 
-Server-rendered HTML that is complete before any script runs. JavaScript is four small ES modules,
-each optional and independently guarded — if one throws, the others still run and the page still
-works:
+Server-rendered HTML that is complete before any script runs. JavaScript is a set of small ES
+modules, each optional and independently guarded — if one throws, the others still run and the page
+still works:
 
 - `nav.js` — the full-screen menu, scrolled state, current-section marking
+- `hero.js` — brings the hero in line by line, the name letter by letter (all of it is in the HTML)
 - `typewriter.js` — the hero's rotating discipline (first word is in the HTML)
 - `reveal.js` — fades in sections that are below the fold, and only those
 - `contact.js` — upgrades the real `<form>` to `fetch`; falls back to a normal POST if anything goes
   wrong
-- `session.js` — replays the hero's Claude Code session, rotating through three clients (the first
-  transcript is already in the HTML)
+- `session.js` — replays the Claude Code session below the hero, rotating through three clients (the
+  first transcript is already in the HTML)
 - `splash.js` — opens the launch-offer dialog, once, to a visitor who is actually reading
 - `layers.js` — reveals the six-layer stack on the landing page (the diagram is already in the HTML)
 - `coderain.js` — the scrolling pseudo-code behind the admin sign-in, and nowhere else
@@ -387,9 +388,11 @@ works:
 `sky.js` — the gold shooting stars — is dynamically imported during idle time, and never at all when
 the visitor prefers reduced motion.
 
-Anime.js has exactly two callers, `sky.js` and `session.js`, and neither loads it eagerly: the sky
-waits for idle, and the session waits until the hero terminal is actually on screen. The vendored
-build is 42 KB, which is too much to put in front of a hero that is already readable without it.
+Anime.js callers are `sky.js`, `session.js`, `layers.js` and `hero.js`, and none loads it eagerly:
+the sky waits for idle, the session and the stack wait until they are on screen, and the hero —
+which is on screen from the start — imports it only after checking the visitor has not asked for
+reduced motion. The vendored build is 42 KB, which is too much to put in front of a hero that is
+already readable without it.
 
 The navigation keeps the same contract from the other direction. The links are ordinary anchors in
 the markup, and the stylesheet decides how they are presented: with the enhancement flag set they
@@ -399,11 +402,11 @@ lazily imports Anime.js for the hairline sweep and the staggered rise, while the
 CSS `clip-path` transition — Anime.js cannot interpolate `polygon()` and would snap between shapes.
 If that import fails, the menu still opens.
 
-The hero session is worth understanding as a pattern, because it is the same contract every
-enhancement here keeps. `src/content/session.ts` holds the transcript as data; `home.ts` renders
-**every line of it, finished**, into the HTML; `session.js` then hides those lines and brings them
-back in order. Turn JavaScript off, prefer reduced motion, or let the module throw, and the visitor
-reads a completed session rather than an empty box. The figure is `aria-hidden` with a one-sentence
+The session is worth understanding as a pattern, because it is the same contract every enhancement
+here keeps. `src/content/session.ts` holds the transcript as data; `home.ts` renders **every line of
+it, finished**, into the HTML; `session.js` then hides those lines and brings them back in order.
+Turn JavaScript off, prefer reduced motion, or let the module throw, and the visitor reads a
+completed session rather than an empty box. The figure is `aria-hidden` with a one-sentence
 `visually-hidden` summary beside it, so a screen reader hears what happened instead of every typed
 character.
 

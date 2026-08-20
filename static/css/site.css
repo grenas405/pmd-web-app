@@ -865,17 +865,60 @@ main {
 
 /* ------------------------------------------------------------------ hero - */
 
+/*
+ * Centred and full-height, following portfolio-app's hero. Everything in here
+ * is visible as served: hero.js hides pieces and brings them back, so nothing
+ * below may start at `opacity: 0`. A hero that needs JavaScript to be readable
+ * is a hero that is blank for anyone whose script fails.
+ */
+
 .hero {
-  max-width: var(--measure);
-  margin-inline: auto;
-  padding: clamp(3rem, 9vw, 7rem) var(--gutter) clamp(3.5rem, 8vw, 6rem);
+  position: relative;
+  isolation: isolate;
+  /* svh, not vh: on mobile Safari `100vh` is taller than the visible viewport,
+     which pushes the scroll cue below the fold — the one element whose whole
+     job is to be seen without scrolling. */
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* The masthead is fixed and roughly 4.5rem; without this the eyebrow renders
+     underneath it. */
+  padding: clamp(6rem, 12vh, 8rem) var(--gutter) clamp(3rem, 7vh, 4.5rem);
+  text-align: center;
+}
+
+.hero__aurora {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 30% at 30% 36%, rgba(217, 178, 95, 0.07), transparent 70%),
+    radial-gradient(30% 26% at 71% 28%, rgba(140, 165, 210, 0.08), transparent 70%),
+    radial-gradient(36% 30% at 55% 62%, rgba(217, 178, 95, 0.05), transparent 70%);
+  filter: blur(34px);
+  animation: hero-aurora 18s ease-in-out infinite alternate;
+}
+
+@keyframes hero-aurora {
+  from {
+    transform: translate3d(-1.5%, -1%, 0) scale(1);
+    opacity: 0.85;
+  }
+
+  to {
+    transform: translate3d(1.5%, 1.5%, 0) scale(1.07);
+    opacity: 1;
+  }
 }
 
 .hero__eyebrow {
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  margin-bottom: clamp(1.5rem, 4vw, 2.5rem);
+  margin-bottom: clamp(1.25rem, 3vw, 1.75rem);
   font-family: var(--font-mono);
   font-size: 0.6875rem;
   letter-spacing: 0.2em;
@@ -891,38 +934,87 @@ main {
   box-shadow: 0 0 12px 2px rgba(217, 178, 95, 0.55);
 }
 
+/*
+ * The name. Words are flex children so a narrow screen wraps between them
+ * rather than overflowing: uppercase "DOMINGUEZ" is one unbreakable token, and
+ * a clamp floor that does not fit it at 320px is how this page shipped a
+ * horizontal scrollbar once already. Hence the low minimum — it is not
+ * timidity, it is the width of that word.
+ */
 .hero__title {
-  margin-bottom: clamp(1.25rem, 3vw, 2rem);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 0.28em;
+  margin-bottom: clamp(0.75rem, 2vw, 1.15rem);
   font-family: var(--font-display);
   font-variation-settings: "opsz" 144;
-  font-weight: 600;
-  font-size: clamp(2.6rem, 1rem + 9.2vw, 7.5rem);
-  line-height: 0.94;
-  letter-spacing: -0.035em;
-  /* When a line does have to wrap on a narrow screen, split it evenly rather
-     than leaving one word stranded. Ignored by browsers that lack it, which
-     simply wrap normally. */
-  text-wrap: balance;
-}
-
-.hero__line {
-  display: block;
-}
-
-.hero__line--accent {
+  font-weight: 700;
+  font-size: clamp(2.1rem, 0.6rem + 8.6vw, 6.5rem);
+  line-height: 0.92;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
   background: linear-gradient(96deg, var(--gold-bright) 8%, var(--gold) 48%, var(--gold-deep) 96%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  text-wrap: balance;
+}
+
+.hero__word {
+  display: inline-flex;
+}
+
+.hero__letter {
+  display: inline-block;
+  /* The reveal writes transform and opacity here and clears them when it ends. */
+  will-change: transform, opacity;
+}
+
+.hero__role {
+  margin-bottom: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: clamp(0.72rem, 0.6rem + 0.6vw, 1rem);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.hero__location {
+  margin-bottom: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: clamp(0.62rem, 0.55rem + 0.35vw, 0.8rem);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+.hero__stats {
+  font-family: var(--font-mono);
+  font-size: clamp(0.58rem, 0.52rem + 0.3vw, 0.72rem);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--gold-deep);
+  /* Long on a phone, and every separator is a legitimate break point. */
+  text-wrap: balance;
+}
+
+.hero__divider {
+  width: min(18rem, 60%);
+  height: 1px;
+  margin: clamp(1.1rem, 3vw, 1.5rem) auto;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  opacity: 0.6;
 }
 
 .hero__rotator {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
+  justify-content: center;
   gap: 0.55rem;
   min-height: 2.2em;
-  margin-bottom: clamp(1.75rem, 4vw, 2.5rem);
+  margin-bottom: clamp(1.5rem, 4vw, 2.25rem);
   font-size: clamp(1.05rem, 0.9rem + 1.1vw, 1.5rem);
   color: var(--text-soft);
 }
@@ -932,6 +1024,73 @@ main {
   font-variation-settings: "opsz" 24;
   font-style: italic;
   color: var(--text-mute);
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.9rem;
+  margin-bottom: clamp(1rem, 2.5vw, 1.35rem);
+}
+
+.hero__trust {
+  margin-bottom: clamp(2rem, 5vh, 3rem);
+  font-family: var(--font-mono);
+  font-size: clamp(0.58rem, 0.52rem + 0.3vw, 0.72rem);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  text-wrap: balance;
+}
+
+.hero__trust strong {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.hero__cue {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.hero__cue:hover,
+.hero__cue:focus-visible {
+  color: var(--gold);
+}
+
+.hero__cue svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+  animation: hero-cue 2.4s ease-in-out infinite;
+}
+
+@keyframes hero-cue {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero__aurora,
+  .hero__cue svg {
+    animation: none;
+  }
 }
 
 .typewriter {
@@ -964,32 +1123,19 @@ main {
   }
 }
 
-.hero__lede {
-  max-width: 54ch;
-  margin-bottom: 2.25rem;
-  font-size: clamp(1.0625rem, 1rem + 0.4vw, 1.25rem);
-  color: var(--text-soft);
-}
-
-.hero__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.9rem;
-  margin-bottom: clamp(3rem, 7vw, 4.5rem);
-}
-
 /* --------------------------------------------------------------- session - */
 
 /*
- * The hero terminal. It is served complete and readable; session.js hides the
- * rows and replays them only once it has decided to. Nothing below assumes the
+ * The terminal. It is served complete and readable; session.js hides the rows
+ * and replays them only once it has decided to. Nothing below assumes the
  * animation ever runs.
  */
 
 .session {
+  /* Left, with the label and heading above it. The section is left-aligned, so
+     centring the figure only pulls it out of line with its own title. The rule
+     above it is the section's now, so it needs none of its own. */
   margin: 0;
-  padding-top: 2rem;
-  border-top: var(--rule);
   max-width: 44rem;
 }
 

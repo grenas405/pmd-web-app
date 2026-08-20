@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+### The hero, rebuilt on portfolio-app's shape
+
+The landing page now opens the way `portfolio-app` does: centred, full-height, and leading with the
+name rather than the tagline. What was borrowed is the **information architecture**; the tokens,
+naming and motion rules stayed this app's own. None of `assets/css/hero.css` was copied — its
+variables (`--navy`, `--gold-dk`) and flat class names do not exist here, and importing them would
+have left two vocabularies in one stylesheet.
+
+- **The name is the `h1`.** "One Person. One Paradigm Shift." moves to the eyebrow, exactly where
+  portfolio-app puts it. The `h1` now matches what somebody actually searches for and what the
+  JSON-LD `Person` already claimed.
+- **The letters are split on the server**, not in the browser. portfolio-app assembles them in
+  JavaScript; doing that here would break the contract every other script keeps, and a heading that
+  only exists after a script runs is a heading a crawler never sees. `aria-label` carries the whole
+  name so a screen reader hears "Pedro M. Dominguez", not eighteen letters.
+- **The stat strip counts, it does not claim.** `4 live sites` comes from `liveSites.length`, so it
+  cannot drift from the roster further down the page. The trust line takes `$295` from `plan.build`
+  — portfolio-app says `$275`, and copying a hero must not copy another site's price.
+- **A ladder of new lines**: role, location, stat strip, gradient divider, trust line and a scroll
+  cue, each mapping to a portfolio-app block. Dropped from the original: the pointer-tilt transform,
+  the hover shine replay and the spark particles, which belong to a louder register than this page.
+- **`hero.js`** reveals it — eyebrow, then the name letter by letter, then the divider drawing
+  itself, then the remaining lines. Modelled on `layers.js`, but with no IntersectionObserver: the
+  hero is the top of the page, so waiting to be seen would mean waiting for something that already
+  happened. Everything is visible as served; the reveal hides pieces and gives them back, never the
+  reverse.
+- **The Claude Code session moved out of the hero** into a section of its own with its own heading,
+  which the scroll cue points at. It had been borrowing the hero's heading, and a full-height hero
+  left it no room. Sections renumbered 01–10.
+
+A browser step asserts the name fits a 375px viewport and finishes its reveal. Verified by mutation:
+raising the font floor to `5rem` fails it with "the name spills 63px past the viewport" — the same
+class of bug that shipped once already as a clipped "ft" and a sideways scrollbar.
+
 ### The contact form stops arguing about length
 
 - **The 20-character minimum on the message is gone**, in the schema and in the `minlength`

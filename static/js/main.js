@@ -7,6 +7,7 @@
  */
 
 import { initNav } from "./nav.js";
+import { initHero } from "./hero.js";
 import { initTypewriter } from "./typewriter.js";
 import { initReveal } from "./reveal.js";
 import { initContactForm } from "./contact.js";
@@ -24,6 +25,9 @@ function attempt(name, start) {
 }
 
 attempt("navigation", initNav);
+// Above the fold, so it does not wait to be seen. It still imports Anime.js
+// lazily, and a visitor who prefers reduced motion never triggers that import.
+attempt("hero", initHero);
 attempt("typewriter", initTypewriter);
 attempt("reveal", initReveal);
 attempt("contact form", initContactForm);
