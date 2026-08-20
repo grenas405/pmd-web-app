@@ -2,13 +2,68 @@
 
 ## Unreleased
 
+### The service could not write its own database
+
+Signing in to `/admin` returned 500, and the page suggested emailing the person reading it. The
+cause was not in the application: `var/kv.sqlite3` was `0640` owned by `sysadmin` with group
+`pmdweb`, so the service could read its database and not write it.
+
+- **`Deno.openKv` succeeds on a read-only database.** Confirmed empirically, and it is why the fault
+  was invisible for a day: the service started, every page rendered, and only writes failed.
+  `GET
+  /admin` is a pure read so the login page appeared; every `POST /admin` writes — the failure
+  counter on a wrong password, the session on a right one — so both answered 500. That is why a
+  wrong password and a correct one were indistinguishable: neither reached the password check.
+- **`deploy.sh` created the condition on every run.** `chmod -R g+rX,g-w,o-rwx "$APP_DIR"` descends
+  into `var/` and strips group-write from the database; the `install -d … -m 2770 var` that follows
+  only ever fixed the directory node, never its contents. The subtree is now re-asserted after the
+  recursive chmod, and the deploy **verifies** it — `sudo -u pmdweb test -w …` on the directory and
+  on the database — and fails rather than shipping a site whose forms silently do not work.
+- **A startup probe.** `main.ts` now writes one throwaway key after opening KV and logs
+  `kv.readonly` with the remedy if it is refused. It reports rather than throws: a site that cannot
+  record enquiries is still worth serving, and exiting would hand systemd a restart loop, turning a
+  broken form into an outage.
+- The public contact form was affected too, since Tuesday's deploy. It degrades rather than crashing
+  — `src/routes/contact.ts` catches the write failure and tells the visitor to email instead — so
+  enquiries were being turned away rather than lost silently.
+
+### Failures now say enough to be fixed
+
+The bug above took a day to find because the server knew and could not say. `src/log.ts` reduced
+every `Error` to `value.message`, discarding the stack — right for anything reaching a browser,
+wrong for journald, which only root and the service account can read.
+
+- **Stacks are kept, in the journal only.** `sanitizeError` records `name`, `message`, up to eight
+  trimmed frames, and a flattened `cause` — flattened rather than recursed into, because causes can
+  form a cycle. Frames go through the same control-character scrubbing as every other value, so a
+  crafted message still cannot forge a log line.
+- **A five-character incident code** on every failed response, logged beside the error. The alphabet
+  drops `0/O` and `1/I/L` so it survives being read aloud or retyped. "The site broke this morning"
+  becomes `journalctl -u pmd-web | grep 7QK2M`.
+- **Two failure pages.** The public one names no internals and points at the phone — the advertised
+  channel — with the code to quote. A request carrying a valid admin session gets the truth instead:
+  error name, message, stack, method and path, on screen. There is nobody to leak to; the reader is
+  the person holding the password, and it is the difference between "I get a 500" and a file and a
+  line number. Choosing between them is a KV read inside an error handler, so it is wrapped and
+  falls back to the public page — if the database is what broke, this must not break on top of it.
+- **A floor beneath both.** The failure page renders through the same layout as every other page, so
+  whatever broke the request can break the page reporting it. Discovered while testing, not in
+  production: a plain-string fallback now carries the incident code when rendering fails twice.
+- **4xx on `/admin` routes through the same chooser.** A `POST` to a GET-only admin route used to
+  render the public page — the one that suggests emailing yourself. It now answers with the code and
+  the method and path that were refused.
+- **Rejections are pinned as rejections.** A wrong password answers 401, a lockout 429, a foreign
+  origin 403, a missing session 303. None of them was a 500 before, but nothing stopped a future
+  change from making one; a test now asserts each answers below 500.
+
 ### An admin area nothing links to
 
 - **`deno task admin-password`** sets or changes the password from the command line, prompting twice
   with echo off. It never travels as a shell argument, so it cannot land in history or in `ps`. It
-  must run as the service user — `sudo -u pmdweb deno task admin-password` — because the unit's
-  `UMask=0027` leaves the KV file `0640` and owned by that account; the message says so when the
-  write is refused.
+  must run as root — `sudo DENO_DIR=/var/cache/pmd-web/deno deno task admin-password` — because the
+  KV file is `0640` owned by `pmdweb`, so it cannot be written as yourself, and `sudo -u pmdweb`
+  fails too: that account cannot traverse a `0750` home to reach the checkout. The message says so
+  when the write is refused.
 - **Stored as PBKDF2-HMAC-SHA256, 210,000 iterations, random salt per password**, via Web Crypto —
   no new dependency, since `crypto.subtle` was already in use for the asset and script hashes.
   Compared in constant time, because `===` on a hash returns early and the time it took says how

@@ -220,6 +220,10 @@ sudo systemd-analyze verify /etc/systemd/system/pmd-web.service
 journalctl -u pmd-web -f --output cat | jq .
 sudo -u pmdweb deno task inbox | jq .   # enquiries live in KV, owned by the service
 
+# Every failed request carries a five-character incident code, shown on the page
+# and written to the journal. Given a code, the failure is one grep away:
+journalctl -u pmd-web --output cat | grep 7QK2M | jq .
+
 # Set or change the admin password. As root, and the reason is worth knowing:
 # the KV file is 0640 owned by pmdweb, so you cannot write it as yourself — but
 # `sudo -u pmdweb` fails too, because sudo does not change directory and pmdweb
@@ -233,6 +237,32 @@ sudo DENO_DIR=/var/cache/pmd-web/deno deno task admin-password
 # service would not be able to write past it.
 ls -l var/
 ```
+
+#### When the service cannot write its database
+
+The symptom is specific and misleading: pages render, sign-in returns 500, and the contact form
+answers "I could not store that message." Reads work and writes do not, so nothing looks broken from
+the outside.
+
+`Deno.openKv` succeeds on a database it cannot write, so a healthy-looking service proves nothing.
+Since the startup probe landed, the journal says so directly at boot:
+
+```sh
+journalctl -u pmd-web --output cat | grep kv.readonly | jq .
+```
+
+The cause is ownership. `var/` and everything in it must be writable by the service account:
+
+```sh
+ls -l var/                              # want: pmdweb, group-writable
+sudo chown -R pmdweb:sysadmin var
+sudo chmod 2770 var
+sudo systemctl restart pmd-web
+```
+
+`deploy.sh` now verifies this before it finishes and refuses to complete a deploy that would leave
+the database unwritable — a recursive `chmod` over the checkout used to strip group-write from the
+database on its way past.
 
 ### Server hardening (nginx + fail2ban)
 

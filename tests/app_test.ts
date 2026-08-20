@@ -592,3 +592,141 @@ Deno.test("the admin area is not linked, listed or indexed", async () => {
   const robots = await (await app(get("/robots.txt"), "203.0.113.1")).text();
   assertStringIncludes(robots, "Disallow: /admin");
 });
+
+// --- failure handling -------------------------------------------------------
+//
+// The incident code is the only thing shared between the page a visitor sees and
+// the line in the journal. Everything below is about keeping that true, and
+// keeping the stack on the private side of the line.
+
+/**
+ * An app whose rendering throws, built by poisoning the `jsonLd` getter the
+ * layout reads on every page. No test-only route is added to production code:
+ * the failure comes from the same seam the real one came from.
+ */
+async function buildFailingApp() {
+  const kv = await Deno.openKv(":memory:");
+  const config = parseConfig({ PUBLIC_ORIGIN: ORIGIN, APP_ENV: "production" });
+  const contact = await createContactStore(kv, config.origin);
+  const app = createApp({
+    config,
+    logger: silentLogger,
+    render: {
+      origin: config.origin,
+      asset: (path) => `/static${path}`,
+      get jsonLd(): string {
+        throw new Error("poisoned graph");
+      },
+      get contact() {
+        return contact.current();
+      },
+    },
+    security: {
+      hsts: config.hsts,
+      get scriptHashes() {
+        return contact.scriptHashes();
+      },
+    },
+    startedAt: new Date("2026-01-01T00:00:00Z"),
+    kv,
+    contact,
+  });
+  return { app, kv };
+}
+
+Deno.test("a thrown request answers 500 with a code and no stack", async () => {
+  const { app, kv } = await buildFailingApp();
+  try {
+    const response = await app(new Request(`${ORIGIN}/`), "127.0.0.1");
+    assertEquals(response.status, 500);
+    const body = await response.text();
+
+    const code = body.match(/[A-Z2-9]{5}/);
+    assert(code !== null, "the page must carry an incident code to quote");
+
+    assert(!body.includes(".ts:"), "a source path reached a visitor");
+    assert(!/\bat [A-Za-z]+ \(/.test(body), "a stack frame reached a visitor");
+    assert(!body.includes("poisoned graph"), "the exception text reached a visitor");
+  } finally {
+    kv.close();
+  }
+});
+
+Deno.test("no public page ever leaks a stack frame", async () => {
+  const app = await buildApp();
+  for (const path of ["/", "/pricing", "/thesis", "/nothing-here", "/admin"]) {
+    const body = await (await app(new Request(`${ORIGIN}${path}`), "127.0.0.1")).text();
+    assert(!body.includes(".ts:"), `${path} leaked a source path`);
+    assert(!/\bat [A-Za-z]+ \(/.test(body), `${path} leaked a stack frame`);
+  }
+});
+
+Deno.test("the public failure page points at the phone, not at an inbox", async () => {
+  const { app, kv } = await buildFailingApp();
+  try {
+    const body = await (await app(new Request(`${ORIGIN}/`), "127.0.0.1")).text();
+    assertStringIncludes(body, "405-984-7036");
+  } finally {
+    kv.close();
+  }
+});
+
+Deno.test("a wrong method on an admin route is refused, not blamed on the visitor", async () => {
+  const app = await buildApp();
+  const response = await app(
+    new Request(`${ORIGIN}/admin/dashboard`, { method: "POST", body: "" }),
+    "127.0.0.1",
+  );
+  assertEquals(response.status, 405);
+  const body = await response.text();
+
+  // Scoped to the notice: the footer carries the email on every page, and that
+  // is fine. The complaint was the failure message itself saying "email me".
+  const notice = body.match(/<section class="notice">[\s\S]*?<\/section>/)?.[0] ?? "";
+  assert(notice.length > 0, "the failure page should render a notice");
+  assert(!notice.includes("@"), "the failure message must not tell the owner to email himself");
+  assert(/[A-Z2-9]{5}/.test(notice), "a refused admin request still gets a code");
+});
+
+Deno.test("when the failure page itself fails, the code still reaches the visitor", async () => {
+  const kv = await Deno.openKv(":memory:");
+  const config = parseConfig({ PUBLIC_ORIGIN: ORIGIN, APP_ENV: "production" });
+  const contact = await createContactStore(kv, config.origin);
+  const app = createApp({
+    config,
+    logger: silentLogger,
+    render: {
+      origin: config.origin,
+      // Inside the layout, so rendering the error page throws too. This is the
+      // scenario the plain-string fallback exists for.
+      asset: () => {
+        throw new Error("layout is gone");
+      },
+      get jsonLd() {
+        return contact.jsonLd();
+      },
+      get contact() {
+        return contact.current();
+      },
+    },
+    security: {
+      hsts: config.hsts,
+      get scriptHashes() {
+        return contact.scriptHashes();
+      },
+    },
+    startedAt: new Date("2026-01-01T00:00:00Z"),
+    kv,
+    contact,
+  });
+
+  try {
+    const response = await app(new Request(`${ORIGIN}/`), "127.0.0.1");
+    assertEquals(response.status, 500);
+    const body = await response.text();
+    assert(/[A-Z2-9]{5}/.test(body), "the incident code must survive the fallback");
+    assert(!body.includes("layout is gone"), "the fallback must not leak either");
+  } finally {
+    kv.close();
+  }
+});

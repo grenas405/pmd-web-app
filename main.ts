@@ -14,6 +14,7 @@ import { indexAssets } from "./src/http/assets.ts";
 import type { SecurityOptions } from "./src/http/security.ts";
 import { createApp } from "./src/app.ts";
 import { createContactStore } from "./src/admin/contact.ts";
+import { probeWritable } from "./src/kv_probe.ts";
 import type { RenderContext } from "./src/render/context.ts";
 
 export async function start(): Promise<Deno.HttpServer> {
@@ -28,6 +29,10 @@ export async function start(): Promise<Deno.HttpServer> {
   // storage. The file lives in `var/`, the one writable directory the service
   // has.
   const kv = await Deno.openKv(config.kvPath);
+
+  // Opening succeeds on a database this process cannot write, so opening proves
+  // nothing. Ask it directly, once, while somebody is still watching the deploy.
+  await probeWritable(kv, logger, config.kvPath);
 
   // Owns the contact details, the JSON-LD they appear in, and that graph's
   // hash — all three recomputed together whenever the admin edits them.

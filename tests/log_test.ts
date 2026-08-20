@@ -38,11 +38,40 @@ Deno.test("long values are truncated so one request cannot flood the log", () =>
   assert(typeof value === "string" && value.length <= 513);
 });
 
-Deno.test("errors are reduced to their message, never their stack", () => {
+Deno.test("errors keep name, message and stack — the journal is private", () => {
   const line = formatEvent("error", "boom", { error: new Error("disk full") }, new Date());
   const parsed = JSON.parse(line);
-  assertEquals(parsed.error, "disk full");
-  assert(!line.includes("at "), "stack frames must not be logged");
+  assertEquals(parsed.error.name, "Error");
+  assertEquals(parsed.error.message, "disk full");
+  assert(Array.isArray(parsed.error.stack), "the stack is what makes the line useful");
+  assert(parsed.error.stack.length > 0, "a thrown Error always has at least one frame");
+  assert(
+    parsed.error.stack[0].startsWith("at "),
+    `the first frame is the throw site, got ${parsed.error.stack[0]}`,
+  );
+});
+
+Deno.test("a stack is trimmed to a readable number of frames", () => {
+  // Deep enough that an untrimmed stack would run well past the cap.
+  const deep = (depth: number): Error => depth === 0 ? new Error("bottom") : deep(depth - 1);
+  const parsed = JSON.parse(formatEvent("error", "boom", { error: deep(40) }, new Date()));
+  assert(parsed.error.stack.length <= 8, `got ${parsed.error.stack.length} frames`);
+});
+
+Deno.test("an error message cannot forge a second log line", () => {
+  const forged = new Error('legit"}\n{"level":"info","msg":"all clear');
+  const line = formatEvent("error", "boom", { error: forged }, new Date());
+  assertEquals(line.split("\n").length, 1, "one event is one line");
+  // The newline survives as a space, so nothing is silently swallowed either.
+  assert(JSON.parse(line).error.message.includes("all clear"));
+});
+
+Deno.test("a cause is flattened, so a cycle cannot hang the logger", () => {
+  const inner = new Error("readonly database");
+  const outer = new Error("could not store enquiry", { cause: inner });
+  inner.cause = outer;
+  const parsed = JSON.parse(formatEvent("error", "boom", { error: outer }, new Date()));
+  assertEquals(parsed.error.cause, "Error: readonly database");
 });
 
 Deno.test("undefined fields are dropped rather than serialised", () => {

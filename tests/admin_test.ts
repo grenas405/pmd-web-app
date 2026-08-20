@@ -299,3 +299,122 @@ Deno.test("with nothing overridden the site is exactly the committed one", async
     kv.close();
   }
 });
+
+// --- failures, told to the person who can fix them ---------------------------
+
+/**
+ * The admin app with a poisoned `jsonLd` getter, so rendering throws from the
+ * same seam a real failure would. Sessions still work, which is the point: the
+ * question is what a *signed-in* reader is shown when something breaks.
+ */
+async function buildFailingAdmin() {
+  const kv = await Deno.openKv(":memory:");
+  const config = parseConfig({ PUBLIC_ORIGIN: ORIGIN, APP_ENV: "production" });
+  const contact = await createContactStore(kv, config.origin);
+  let poisoned = false;
+  const app = createApp({
+    config,
+    logger: silentLogger,
+    render: {
+      origin: config.origin,
+      asset: (path) => `/static${path}`,
+      get jsonLd() {
+        return contact.jsonLd();
+      },
+      get contact() {
+        return contact.current();
+      },
+    },
+    security: {
+      hsts: config.hsts,
+      get scriptHashes() {
+        return contact.scriptHashes();
+      },
+    },
+    startedAt: new Date("2026-01-01T00:00:00Z"),
+    kv,
+    // The dashboard reads its contact details from the store, not from the
+    // render context, so this breaks that page and leaves everything else — the
+    // layout, the session lookup — working. A seam inside the layout would take
+    // the failure page down with it and prove nothing about what a signed-in
+    // reader is shown.
+    contact: {
+      ...contact,
+      current: () => {
+        if (poisoned) throw new Error("poisoned graph");
+        return contact.current();
+      },
+    },
+  });
+  return { app, kv, poison: () => void (poisoned = true) };
+}
+
+Deno.test("a signed-in reader is shown the actual error, stack included", async () => {
+  const { app, kv, poison } = await buildFailingAdmin();
+  try {
+    await setPassword(kv, PASSWORD);
+    const signedIn = await app(post("/admin", `password=${PASSWORD}`), "203.0.113.9");
+    const cookie = (signedIn.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+    await signedIn.body?.cancel();
+
+    poison();
+    const response = await app(get("/admin/dashboard", { cookie }), "203.0.113.9");
+    assertEquals(response.status, 500);
+    const body = await response.text();
+
+    // The three things that turn "I get a 500" into a file and a line number.
+    assertStringIncludes(body, "poisoned graph");
+    assert(/\bat [A-Za-z]/.test(body), "the stack should be on the page");
+    assertStringIncludes(body, "GET /admin/dashboard");
+
+    // And the code, so the same failure can be found in the journal afterwards.
+    assert(/[A-Z2-9]{5}/.test(body), "the incident code should be shown too");
+  } finally {
+    kv.close();
+  }
+});
+
+Deno.test("the same failure, signed out, says nothing", async () => {
+  const { app, kv, poison } = await buildFailingAdmin();
+  try {
+    poison();
+    const response = await app(get("/admin/dashboard"), "203.0.113.10");
+    const body = await response.text();
+    assert(!body.includes("poisoned graph"), "the exception text reached a stranger");
+    assert(!body.includes(".ts:"), "a source path reached a stranger");
+  } finally {
+    kv.close();
+  }
+});
+
+Deno.test("a refused sign-in is never a crash", async () => {
+  const { app, kv } = await buildAdmin();
+  try {
+    await setPassword(kv, PASSWORD);
+
+    // Each of these is a rejection, and a rejection is not a 500. Without this,
+    // nothing stops a future change to the auth path turning one into the other
+    // — which is exactly the confusion the live 500 caused.
+    const cases: [string, Promise<Response>][] = [
+      ["wrong password", app(post("/admin", "password=nope"), "203.0.113.20")],
+      ["empty password", app(post("/admin", ""), "203.0.113.21")],
+      [
+        "foreign origin",
+        app(
+          post("/admin", `password=${PASSWORD}`, { origin: "https://evil.example" }),
+          "203.0.113.22",
+        ),
+      ],
+      ["no session", app(get("/admin/dashboard"), "203.0.113.23")],
+    ];
+
+    for (const [name, pending] of cases) {
+      const response = await pending;
+      await response.body?.cancel();
+      assert(response.status !== 500, `${name} answered 500 instead of refusing`);
+      assert(response.status < 500, `${name} answered ${response.status}`);
+    }
+  } finally {
+    kv.close();
+  }
+});

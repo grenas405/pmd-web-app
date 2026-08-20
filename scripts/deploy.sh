@@ -258,13 +258,33 @@ chown -R "$OWNER_USER:$SERVICE_GROUP" "$APP_DIR"
 # never a source file that has no business being executable.
 chmod -R g+rX,g-w,o-rwx "$APP_DIR"
 
-# var/ inverts it: the service owns the inbox and writes it, and the owner's
-# group writes too, because `deno task verify` runs the suite here (see the
-# INBOX_PATH in tests/app_test.ts) and the next deploy would fail at Verify if
-# it could not. setgid so anything either of them creates keeps the group.
+# var/ inverts it: the service owns the database and writes it, and the owner's
+# group writes too, because `deno task verify` runs the suite here and the next
+# deploy would fail at Verify if it could not. setgid so anything either of them
+# creates keeps the group.
+#
+# The recursive chmod above walked straight through var/ and took group-write off
+# the database sitting inside it. Fixing the directory node is not enough: the
+# file the service opens is what matters, and a service that can read but not
+# write its own KV answers 500 to every enquiry and every sign-in. So the whole
+# subtree is re-asserted, not just the directory.
 install -d -o "$SERVICE_USER" -g "$OWNER_GROUP" -m 2770 "$APP_DIR/var"
+chown -R "$SERVICE_USER:$OWNER_GROUP" "$APP_DIR/var"
+chmod -R u+rwX,g+rwX,o-rwx "$APP_DIR/var"
+
+# Checked by ownership rather than by `sudo -u "$SERVICE_USER" test -w`, which
+# would look right and fail for the wrong reason: that account cannot traverse
+# the owner's 0750 home to reach this path at all. It only ever sees var/ through
+# systemd's bind mount. Root can write regardless, so asking root proves nothing
+# either — the owner of the file is the thing worth asserting.
+if [ -e "$APP_DIR/var/kv.sqlite3" ]; then
+  kv_owner="$(stat -c %U "$APP_DIR/var/kv.sqlite3")"
+  [ "$kv_owner" = "$SERVICE_USER" ] ||
+    fail "var/kv.sqlite3 is owned by $kv_owner, not $SERVICE_USER — the service would be able to read it and not write it, which fails every enquiry and every sign-in"
+fi
+
 info "$APP_DIR is $OWNER_USER:$SERVICE_GROUP, group read-only"
-info "$APP_DIR/var is $SERVICE_USER:$OWNER_GROUP, writable by both"
+info "$APP_DIR/var is $SERVICE_USER:$OWNER_GROUP, writable by both (verified)"
 
 # --- environment file ------------------------------------------------------------
 # Installed only when absent. It is the one file on the server that is meant to
@@ -358,6 +378,20 @@ if [ "$healthy" -eq 0 ]; then
   fail "no answer on 127.0.0.1:$APP_PORT/healthz — the service is not serving"
 fi
 info "127.0.0.1:$APP_PORT/healthz -> $body"
+
+# Answering /healthz is not the same as working. Deno KV opens a database it
+# cannot write without complaint, so a service can serve every page and still
+# fail every enquiry and every sign-in. main.ts probes that at boot; this is
+# where the deploy reads the answer, through the real bind mount, as the real
+# user, against the real database. It is the check that would have caught this
+# at deploy time instead of days later.
+if journalctl -u "$SERVICE_NAME" --since "-2 min" --output cat 2>/dev/null |
+  grep -q '"msg":"kv.readonly"'; then
+  journalctl -u "$SERVICE_NAME" --since "-2 min" --output cat |
+    grep '"msg":"kv.readonly"' | tail -n 1 >&2
+  fail "the service cannot write its database — see the line above, then: sudo chown -R $SERVICE_USER:$OWNER_GROUP $APP_DIR/var"
+fi
+info "$SERVICE_USER can write its database"
 
 # --- certificates ------------------------------------------------------------------
 # Before the reverse proxy, because the vhost names its key material by
@@ -542,5 +576,5 @@ fi
 
 step "Deployed"
 info "journalctl -u $SERVICE_NAME -f --output cat | jq ."
-info "sudo -u $SERVICE_USER tail -f $APP_DIR/var/inbox.jsonl | jq ."
+info "sudo DENO_DIR=$DENO_CACHE $DENO task inbox"
 info "sudo fail2ban-client status nginx-probes"
