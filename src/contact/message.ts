@@ -38,7 +38,10 @@ export const ContactSchema = z.object({
   company: text(120).pipe(z.string().max(120, "That business name is too long.")).optional(),
   message: text(4000).pipe(
     z.string()
-      .min(20, "A sentence or two about the problem helps — 20 characters minimum.")
+      // No length floor beyond "not empty": a visitor who writes "need a website"
+      // is a lead, and a form that argues with them about it is a lost one. The
+      // client's `required` covers the same ground; this is its server-side half.
+      .min(1, "Please tell me what you need.")
       .max(4000, "Please keep it under 4000 characters; we can go deeper by email."),
   ),
   /**

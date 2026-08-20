@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### The contact form stops arguing about length
+
+- **The 20-character minimum on the message is gone**, in the schema and in the `minlength`
+  attribute both. "Need a website" is a lead; a form that refuses it and asks for a longer
+  explanation turns that lead into a bounce. Nothing about the enquiry was better for the floor
+  being there.
+- Empty is still refused. `text()` trims, so dropping the minimum outright would have accepted a
+  blank enquiry — `min(1)` is the server-side half of the field's `required` attribute, not a
+  reinstated length rule.
+
 ### The service could not write its own database
 
 Signing in to `/admin` returned 500, and the page suggested emailing the person reading it. The

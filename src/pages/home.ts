@@ -670,7 +670,6 @@ function contactSection(state: ContactFormState, plan?: PlanId): Html {
               id="contact-message"
               name="message"
               rows="6"
-              minlength="20"
               maxlength="4000"
               required
               ${errorAttrs(errors, "message")}
