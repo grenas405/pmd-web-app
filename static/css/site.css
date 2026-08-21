@@ -875,6 +875,14 @@ main {
 .hero {
   position: relative;
   isolation: isolate;
+  /*
+   * The aurora animates out to scale(1.07), which reaches past this box on
+   * every side. `body { overflow-x: clip }` catches that, but `overflow: clip`
+   * needs Safari 16 — before it, the declaration is dropped entirely and the
+   * page gains a sideways scroll of about 20px on a phone. `hidden` here is
+   * understood everywhere and contains the decoration at its source.
+   */
+  overflow: hidden;
   /* svh, not vh: on mobile Safari `100vh` is taller than the visible viewport,
      which pushes the scroll cue below the fold — the one element whose whole
      job is to be seen without scrolling. */
@@ -954,11 +962,22 @@ main {
   line-height: 0.92;
   letter-spacing: 0.01em;
   text-transform: uppercase;
-  background: linear-gradient(96deg, var(--gold-bright) 8%, var(--gold) 48%, var(--gold-deep) 96%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  /* Solid gold is the real declaration. The gradient below only replaces it
+     where clipping text to a background actually works — `color: transparent`
+     with no fallback is a heading that disappears completely the moment the
+     clip does not take, and this heading is the visitor's first word. */
+  color: var(--gold);
   text-wrap: balance;
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .hero__title {
+    background: linear-gradient(96deg, var(--gold-bright) 8%, var(--gold) 48%, var(--gold-deep)
+      96%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
 }
 
 .hero__word {
@@ -967,8 +986,15 @@ main {
 
 .hero__letter {
   display: inline-block;
-  /* The reveal writes transform and opacity here and clears them when it ends. */
-  will-change: transform, opacity;
+  /*
+   * No `will-change` here, deliberately. It promotes every letter to its own
+   * compositing layer for the life of the page, and a gradient clipped to text
+   * on the parent does not reliably paint onto promoted descendant layers —
+   * WebKit drops it, which leaves sixteen transparent letters and no name.
+   *
+   * The reveal writes transform and opacity inline and clears them when it
+   * ends, so the promotion it needs lasts exactly as long as the animation.
+   */
 }
 
 .hero__role {

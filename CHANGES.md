@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+### The hero's name could vanish, and the aurora could push the page sideways
+
+Both reported from a phone, and neither reproduces in Chromium — no overflow at any width from 320px
+to 768px, and the name paints. Both are WebKit-shaped, and both were real fragilities in what
+shipped rather than guesses about a browser:
+
+- **`color: transparent` had no fallback.** Clipping text to a gradient means colouring the text
+  transparent and letting the background show through it. If the clip does not take — unsupported,
+  or dropped by a rendering quirk — what is left is transparent text on a dark page, which is a
+  heading that is simply not there. The solid gold is now the real declaration and the gradient
+  replaces it only inside `@supports`.
+- **`will-change: transform` on every letter** promoted all sixteen to their own compositing layers
+  for the life of the page, and WebKit does not reliably paint a parent's clipped gradient onto a
+  promoted descendant. Removed: the reveal writes its transforms inline and clears them, so the
+  promotion it needs lasts exactly as long as the animation and not a moment longer.
+- **The aurora animates out to `scale(1.07)`**, reaching past the hero on every side. Only
+  `body { overflow-x: clip }` was containing that, and `overflow: clip` needs Safari 16 — before it
+  the declaration is dropped entirely, taking the containment with it and leaving roughly 20px of
+  sideways scroll on a phone. `.hero` now clips its own decoration with `overflow: hidden`, which
+  every browser understands.
+
+A browser step asserts the invariant behind the first two: the title may be transparent only when
+something is demonstrably painting it, and no letter may carry `will-change`. Verified by mutation —
+restoring `will-change` fails it.
+
 ### The hero, rebuilt on portfolio-app's shape
 
 The landing page now opens the way `portfolio-app` does: centred, full-height, and leading with the

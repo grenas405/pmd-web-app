@@ -301,6 +301,44 @@ Deno.test("the site behaves in a browser", async (t) => {
       });
     });
 
+    await t.step("the name is painted, whatever the browser does with gradients", async () => {
+      await withPage(harness, PHONE, async (page) => {
+        await page.goto(harness.origin);
+
+        // The failure this guards against: `color: transparent` is how text is
+        // clipped to a gradient, and it is also how text becomes invisible. The
+        // two are indistinguishable in the markup, so assert the invariant
+        // directly — transparent is only ever allowed when something else is
+        // demonstrably doing the painting.
+        const paint = await page.evaluate(() => {
+          const title = document.querySelector(".hero__title");
+          if (title === null) return null;
+          const style = globalThis.getComputedStyle(title);
+          return {
+            color: style.color,
+            clip: style.webkitBackgroundClip || style.backgroundClip,
+            image: style.backgroundImage,
+          };
+        });
+
+        assert(paint !== null, "there is no hero title");
+        const transparent = paint.color === "rgba(0, 0, 0, 0)" || paint.color === "transparent";
+        if (transparent) {
+          assertEquals(paint.clip, "text", "the name is transparent and nothing is clipped to it");
+          assert(paint.image !== "none", "the name is transparent with no gradient behind it");
+        }
+
+        // A letter must never be permanently promoted to its own layer: WebKit
+        // does not reliably paint a parent's clipped gradient onto one, and the
+        // result is a heading that is simply not there.
+        const promoted = await page.evaluate(() =>
+          [...document.querySelectorAll(".hero__letter")]
+            .filter((letter) => globalThis.getComputedStyle(letter).willChange !== "auto").length
+        );
+        assertEquals(promoted, 0, "letters carry will-change, which can cost them their gradient");
+      });
+    });
+
     await t.step("the name fits the narrowest phone, and finishes its reveal", async () => {
       await withPage(harness, PHONE, async (page) => {
         await page.goto(harness.origin);
