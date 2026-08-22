@@ -341,6 +341,85 @@ Deno.test("the site behaves in a browser", async (t) => {
       });
     });
 
+    await t.step("the rotating slogan never resizes its box", async () => {
+      await withPage(harness, PHONE, async (page) => {
+        await page.goto(harness.origin);
+        await page.locator(".typewriter [data-typewriter-text]").waitFor();
+
+        // Every slogan, not whichever two the rotation reaches. The slogans run
+        // 31 to 43 characters, so on a phone the long ones wrap and the short
+        // ones do not — without the reserved sizer the buttons below would move
+        // every few seconds.
+        const tops = await page.evaluate(() => {
+          const host = document.querySelector("[data-mode='scramble']") as HTMLElement | null;
+          const text = document.querySelector(".typewriter [data-typewriter-text]");
+          const actions = document.querySelector(".hero__actions");
+          if (host === null || text === null || actions === null) return null;
+
+          const words = JSON.parse(host.dataset.words ?? "[]") as string[];
+          const measured: Record<string, number> = {};
+          const restore = text.textContent;
+          for (const word of words) {
+            text.textContent = word;
+            measured[word] = actions.getBoundingClientRect().top;
+          }
+          text.textContent = restore;
+          return measured;
+        });
+
+        assert(tops !== null, "the rotating slogan was not found");
+        const entries = Object.entries(tops);
+        assert(entries.length >= 2, "there is nothing to rotate through");
+
+        const [, first] = entries[0]!;
+        for (const [word, top] of entries) {
+          assert(
+            Math.abs(top - first) <= 1,
+            `"${word}" moves the buttons ${(top - first).toFixed(1)}px`,
+          );
+        }
+      });
+    });
+
+    await t.step("the slogan always settles on real words", async () => {
+      await withPage(harness, LAPTOP, async (page) => {
+        await page.goto(harness.origin);
+        const text = page.locator(".typewriter [data-typewriter-text]");
+        await text.waitFor();
+
+        const slogans = await page.evaluate(() => {
+          const host = document.querySelector("[data-mode='scramble']") as HTMLElement;
+          return JSON.parse(host.dataset.words ?? "[]") as string[];
+        });
+
+        // Watch two full transitions. Leftover noise on the hero is a worse
+        // failure than no animation, so what matters is where it comes to rest.
+        for (let i = 0; i < 2; i++) {
+          const before = await text.textContent();
+          await page.waitForFunction(
+            (was) =>
+              document.querySelector(".typewriter [data-typewriter-text]")?.textContent !== was,
+            before,
+            { timeout: 15000 },
+          );
+          // Long enough for the scramble to finish and the hold to begin.
+          await page.waitForFunction(
+            (words) =>
+              words.includes(
+                document.querySelector(".typewriter [data-typewriter-text]")?.textContent ?? "",
+              ),
+            slogans,
+            { timeout: 15000 },
+          );
+          const settled = await text.textContent();
+          assert(
+            slogans.includes(settled ?? ""),
+            `the line settled on "${settled}", which is not one of the slogans`,
+          );
+        }
+      });
+    });
+
     await t.step("the rotated tagline carries its language", async () => {
       await withPage(harness, PHONE, async (page) => {
         await page.goto(harness.origin);

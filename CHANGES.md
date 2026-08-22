@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+### Slogans that take a position, and resolve out of noise
+
+The rotating clause was specific, which was right, but folksy — "book jobs while you sleep" sounds
+like a man with a van rather than a firm. The register is raised without giving up a single
+checkable claim, which the research is clear about: the vague tagline is what a company writes when
+it [refuses to choose who it is for](https://theb2bplaybook.com/b2b-positioning-strategy), and
+buyers want plain language about what they get. "Where intelligence meets innovation" would have
+been a downgrade.
+
+- **Every slogan is now a claim and its refusal** — "belong to you, not to a platform", "answer to
+  you, not to an agency", "take bookings at midnight, not just at nine". The construction is the
+  professionalism: it takes a position instead of naming a feature, and it is very hard to write
+  vaguely.
+- **The bilingual promise, said twice.** "speak Spanish, not just English" joins the rotation, and
+  because once in five turns is a weak way to say it, the stat strip carries `ENGLISH & ESPAÑOL`
+  permanently in place of "1 direct line", which "no middlemen" already implied. A test fails if the
+  tilde is ever lost — `ESPANOL` in the one line aimed at Spanish speakers would be worse than
+  silence.
+- **"answer faster than your competitors" was cut** from the approved set. It is a comparative claim
+  about businesses nobody has measured, and it would have been the only line on the page that could
+  not be defended if challenged.
+- **The transition is a decode.** Each character is replaced with noise and settles left to right
+  over about 800ms. Spaces never scramble — dissolving the word boundaries turns a sentence being
+  decoded into mush — and the final string is written unconditionally at the end, because an
+  interrupted scramble leaving nonsense across the hero is worse than no animation at all. No
+  Anime.js: this is character substitution on a timer. The old character-by-character `type` mode is
+  gone, since nothing used it any more.
+
+**And the fault this would otherwise have shipped.** The slogans run 31–43 characters, so on a phone
+the long ones wrap onto a second line and the short ones do not — the buttons below jumped 30px
+every few seconds. Rather than a fourth guess at a `min-height`, the row now holds an invisible copy
+of its longest state stacked underneath the live one, so it is always as tall as the tallest thing
+that can appear in it. The copy has to mirror the live markup exactly, gap and caret included: a
+plain string wraps at a different width and reserves the wrong height, which is how the first
+attempt failed.
+
 ### A hero that talks to the person buying
 
 The hero looked the part and still read like a CV. Three changes, all copy and one of them

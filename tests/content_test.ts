@@ -291,7 +291,33 @@ Deno.test("the hero rotation completes its sentence rather than listing categori
       !phrase.endsWith("."),
       `"${phrase}" ends the sentence early; the prefix already opened it`,
     );
+    // The rendered box is reserved from the longest of these. A phrase far
+    // longer than the rest reserves that much empty space for all the others.
+    assert(
+      phrase.length <= 48,
+      `"${phrase}" is ${phrase.length} characters and would stretch the reserved box`,
+    );
   }
+});
+
+Deno.test("the rotation takes a position rather than describing a feature", () => {
+  // "belong to you, not to a platform" is the shape the whole set is built on:
+  // a claim and its refusal. It is also what makes the line impossible to write
+  // vaguely, which is the failure mode of every AI tagline on the internet.
+  const opposed = site.disciplines.filter((phrase) => phrase.includes(", not"));
+  assert(
+    opposed.length >= site.disciplines.length - 1,
+    `only ${opposed.length} of ${site.disciplines.length} phrases state what they are not`,
+  );
+});
+
+Deno.test("the bilingual promise stays in the rotation", () => {
+  // It is a commitment to build the second language when somebody asks, not a
+  // flourish, so it should not be dropped silently in a copy edit.
+  assert(
+    site.disciplines.some((phrase) => phrase.includes("Spanish")),
+    "the bilingual promise left the rotation",
+  );
 });
 
 Deno.test("every tagline carries a language, and English leads", () => {

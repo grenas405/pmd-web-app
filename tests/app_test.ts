@@ -799,3 +799,14 @@ Deno.test("when the failure page itself fails, the code still reaches the visito
     kv.close();
   }
 });
+
+Deno.test("the hero says Español with its tilde", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  // The stat strip is uppercased in CSS, which is fine — but a source string
+  // spelled "Espanol" renders ESPANOL, misspelling the one word on the page
+  // aimed at the readers it is there to reach.
+  assertStringIncludes(body, "Español");
+  assert(!body.includes("Espanol"), "Español lost its tilde somewhere");
+});

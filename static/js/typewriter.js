@@ -5,10 +5,10 @@
  * file runs and stays complete if it never does. The animation only ever
  * replaces text that is already there.
  *
- * Two callers, one module. The benefit line types, character by character,
- * because that is the line the eye should land on. The tagline cross-fades
- * between languages, because two blinking carets in one viewport is noise
- * rather than craft — `data-mode="fade"` picks which.
+ * Two callers, one module, chosen by `data-mode`. The benefit line resolves out
+ * of noise, character by character, because it is the line the eye should land
+ * on. The tagline cross-fades between languages, because two competing effects
+ * in one viewport is noise rather than craft.
  *
  * A word may be a plain string or `{ text, lang }`. The lang is not decoration:
  * without it a screen reader pronounces "Une Personne" with English phonemes.
@@ -16,10 +16,24 @@
 
 import { motionAllowed, pageVisible } from "./motion.js";
 
-const TYPE_MS = 55;
-const ERASE_MS = 28;
-const HOLD_MS = 2100;
-const BETWEEN_MS = 420;
+const HOLD_MS = 2600;
+
+/*
+ * The scramble. A frame every 45ms is fast enough to read as machine noise and
+ * slow enough that the eye catches individual characters resolving; each one
+ * settles a couple of frames after the one to its left, so the sentence decodes
+ * from the front.
+ */
+const FRAME_MS = 45;
+const SETTLE_STAGGER = 1.6;
+const NOISE_FRAMES = 8;
+
+/*
+ * Weighted towards letters, because a glyph the width of the letter it stands in
+ * for keeps the line from breathing. Spaces are never scrambled — dissolving the
+ * word boundaries turns a sentence being decoded into a wall of mush.
+ */
+const GLYPHS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#$%&*+=/<>[]{}~|";
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -113,33 +127,57 @@ function startRotator(element) {
     }
   }
 
-  async function type() {
+  /**
+   * Replace every character with noise, then let it settle left to right.
+   *
+   * `settleAt` is the frame each position stops being random; multiplying the
+   * index spreads those out so the sentence resolves from the front rather than
+   * all at once.
+   */
+  async function scramble(word) {
+    const target = word.text;
+    const total = Math.ceil(target.length * SETTLE_STAGGER) + NOISE_FRAMES;
+
+    for (let frame = 0; frame <= total; frame++) {
+      if (stopped) return;
+      let out = "";
+      for (let i = 0; i < target.length; i++) {
+        const char = target[i];
+        // Spaces and the settled head of the line are never touched.
+        if (char === " " || frame - NOISE_FRAMES >= i * SETTLE_STAGGER) {
+          out += char;
+          continue;
+        }
+        out += GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+      }
+      output.textContent = out;
+      await wait(FRAME_MS);
+    }
+
+    // Unconditional, not the last loop iteration: an interrupted scramble must
+    // never leave noise on the hero, which is worse than no animation at all.
+    output.textContent = target;
+  }
+
+  async function decode() {
     await wait(HOLD_MS);
     while (!stopped) {
       await whenVisible();
-      const word = words[index];
-      for (let length = word.text.length; length >= 0; length--) {
-        if (stopped) return;
-        output.textContent = word.text.slice(0, length);
-        await wait(ERASE_MS);
-      }
-      await wait(BETWEEN_MS);
-
       index = (index + 1) % words.length;
       const next = words[index];
-      show(next, "");
-      for (let length = 1; length <= next.text.length; length++) {
-        if (stopped) return;
-        output.textContent = next.text.slice(0, length);
-        await wait(TYPE_MS);
-      }
+      show(next, output.textContent);
+      await scramble(next);
+      if (stopped) return;
       await wait(HOLD_MS);
     }
   }
 
-  void (element.dataset.mode === "fade" ? fade() : type());
+  void (element.dataset.mode === "fade" ? fade() : decode());
+
+  // Whatever stops it, the line is left on a real slogan rather than mid-decode.
   return () => {
     stopped = true;
+    output.textContent = words[index].text;
   };
 }
 

@@ -1063,16 +1063,49 @@ main {
   opacity: 0.6;
 }
 
+/*
+ * A one-cell grid with the live line and an invisible copy of its longest state
+ * stacked on top of each other, so the row is always as tall as the tallest
+ * thing that can appear in it.
+ *
+ * This is what stops the hero moving. The slogans run 31 to 43 characters, so on
+ * a phone the long ones wrap onto a second line and the short ones do not, and
+ * the buttons below would jump every few seconds — the same fault the eyebrow
+ * had one row up, where three guesses at a min-height were needed before it was
+ * measured. A reserved copy needs no number at all.
+ *
+ * `minmax(0, 1fr)` rather than an auto column: auto sizes to the sizer's
+ * max-content, which is the whole sentence unwrapped, and that overflows the
+ * page on a phone. The column takes the width it is given, and both copies wrap
+ * inside it exactly as each other.
+ */
 .hero__rotator {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin-bottom: clamp(1.5rem, 4vw, 2.25rem);
+  font-size: clamp(1.05rem, 0.9rem + 1.1vw, 1.5rem);
+  color: var(--text-soft);
+}
+
+/*
+ * The two rows are the same element twice. They have to be: the reserved height
+ * is only right if the hidden copy wraps at exactly the width the live one does,
+ * and a plain string of text does not — it lacks the flex gap between prefix and
+ * clause, and the caret's width at the end. Both of those move the wrap point.
+ */
+.hero__rotator-row {
+  grid-area: 1 / 1;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: center;
   gap: 0.55rem;
-  min-height: 2.2em;
-  margin-bottom: clamp(1.5rem, 4vw, 2.25rem);
-  font-size: clamp(1.05rem, 0.9rem + 1.1vw, 1.5rem);
-  color: var(--text-soft);
+}
+
+.hero__rotator-row--sizer {
+  visibility: hidden;
+  pointer-events: none;
+  user-select: none;
 }
 
 /*

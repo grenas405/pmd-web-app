@@ -68,21 +68,27 @@ export const site = {
    * Rotated through by the hero typewriter, each one completing "Websites
    * that …".
    *
-   * Outcomes, not categories. "Business Websites" is what the work is called;
-   * "book jobs while you sleep" is what the owner is buying, and it is the
-   * second one they recognise as their own problem.
+   * A claim and its refusal, in one breath. The construction is the whole
+   * point: "belong to you, not to a platform" takes a position, where "business
+   * websites" only names a category and "book jobs while you sleep" — the line
+   * this replaced — took the position in a voice that sounded like a man with a
+   * van rather than a firm.
    *
-   * Every phrase is already claimed elsewhere on the site — the signal line by
-   * the offline argument in narrative.ts, the last by the ownership promise in
-   * the trust line. The hero must not sell something the pricing page then has
-   * to walk back.
+   * Every one is checkable. Nothing comparative, nothing about competitors
+   * neither of us has measured: the roster, the site count and the price on
+   * this page can all be verified, and one unfalsifiable line would cost more
+   * than it earns.
    */
   disciplines: [
-    "book jobs while you sleep",
-    "answer while you're on a roof",
-    "turn a quote into a customer",
-    "work with one bar of signal",
-    "you own outright",
+    "belong to you, not to a platform",
+    "answer to you, not to an agency",
+    // A promise, not a flourish: roughly a fifth of Oklahoma City speaks
+    // Spanish at home, and this commits to building the second language when
+    // somebody asks for it. The stat strip says the same thing permanently,
+    // because once in five rotations is a weak way to say it.
+    "speak Spanish, not just English",
+    "take bookings at midnight, not just at nine",
+    "keep working when the signal does not",
   ],
 } as const;
 

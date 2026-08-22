@@ -71,6 +71,9 @@ function hero(): Html {
   const clientNames = liveSites
     .filter((entry) => entry.host !== site.domain)
     .map((entry) => entry.name);
+  // Reserves the box so the rotation cannot resize it. Picked here rather than
+  // written down, so adding a longer slogan cannot quietly reintroduce the jump.
+  const longestDiscipline = site.disciplines.reduce((a, b) => (b.length > a.length ? b : a));
   return html`
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero__aurora" aria-hidden="true"></div>
@@ -106,19 +109,33 @@ function hero(): Html {
           is said here and nowhere else in the hero — it was previously in this
           line, the role above it and a location line between the two. -->
       <p class="hero__stats">
-        ${liveSites.length} live sites · 1 direct line · No middlemen · Oklahoma City
+        ${liveSites.length} live sites · English &amp; Español · No middlemen · Oklahoma City
       </p>
 
       <div class="hero__divider" aria-hidden="true"></div>
 
+      <!-- The hidden copy holds the line open at the height of its longest
+          state, so the buttons below do not move as the slogans rotate. It sits
+          out here rather than around the rotating half because the wrap depends
+          on the whole sentence, prefix included. -->
       <p class="hero__rotator">
-        <span class="hero__rotator-prefix">Websites that</span>
-        <span
-          class="typewriter"
-          data-typewriter
-          data-words="${JSON.stringify(site.disciplines)}"
-        ><span class="typewriter__text" data-typewriter-text>${site
-          .disciplines[0]}</span><span class="typewriter__caret" aria-hidden="true"></span></span>
+        <span class="hero__rotator-row hero__rotator-row--sizer" aria-hidden="true">
+          <span class="hero__rotator-prefix">Websites that</span>
+          <span class="typewriter"
+          ><span class="typewriter__text">${longestDiscipline}</span><span
+            class="typewriter__caret"
+          ></span></span>
+        </span>
+        <span class="hero__rotator-row">
+          <span class="hero__rotator-prefix">Websites that</span>
+          <span
+            class="typewriter"
+            data-typewriter
+            data-mode="scramble"
+            data-words="${JSON.stringify(site.disciplines)}"
+          ><span class="typewriter__text" data-typewriter-text>${site
+            .disciplines[0]}</span><span class="typewriter__caret" aria-hidden="true"></span></span>
+        </span>
       </p>
 
       <div class="hero__actions">
