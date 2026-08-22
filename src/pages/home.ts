@@ -68,13 +68,29 @@ function splitLetters(text: string): Html {
  */
 function hero(): Html {
   const money = `$${pricing.build.toLocaleString("en-US")}`;
+  const clientNames = liveSites
+    .filter((entry) => entry.host !== site.domain)
+    .map((entry) => entry.name);
   return html`
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero__aurora" aria-hidden="true"></div>
 
+      <!-- English is rendered; the rotation swaps in the other four and sets the
+          lang attribute with each, so a screen reader that reaches mid-cycle
+          pronounces French as French. Cross-fade rather than typed: one blinking
+          caret per viewport, and the benefit line below has earned it. -->
       <p class="hero__eyebrow">
         <span class="hero__eyebrow-dot" aria-hidden="true"></span>
-        ${site.tagline}
+        <span
+          class="hero__tagline"
+          data-typewriter
+          data-mode="fade"
+          data-words="${JSON.stringify(site.taglines)}"
+        ><span
+          class="hero__tagline-text"
+          data-typewriter-text
+          lang="${site.taglines[0].lang}"
+        >${site.taglines[0].text}</span></span>
       </p>
 
       <!-- aria-label so this is announced as a name rather than as eighteen
@@ -84,10 +100,11 @@ function hero(): Html {
       </h1>
 
       <p class="hero__role">${site.role}</p>
-      <p class="hero__location">${site.location}</p>
 
       <!-- Counted, never typed: the roster in the work section is the source of
-          truth, and a hardcoded number here would drift away from it. -->
+          truth, and a hardcoded number here would drift away from it. The city
+          is said here and nowhere else in the hero — it was previously in this
+          line, the role above it and a location line between the two. -->
       <p class="hero__stats">
         ${liveSites.length} live sites · 1 direct line · No middlemen · Oklahoma City
       </p>
@@ -95,7 +112,7 @@ function hero(): Html {
       <div class="hero__divider" aria-hidden="true"></div>
 
       <p class="hero__rotator">
-        <span class="hero__rotator-prefix">in</span>
+        <span class="hero__rotator-prefix">Websites that</span>
         <span
           class="typewriter"
           data-typewriter
@@ -111,6 +128,14 @@ function hero(): Html {
 
       <p class="hero__trust">
         Serving OKC small businesses · From <strong>${money}</strong> · You own everything
+      </p>
+
+      <!-- The strongest thing on this page is that these are checkable. Derived
+          from the roster, with this site filtered out of its own proof, so it
+          can never name a site that is not up. -->
+      <p class="hero__clients">
+        <span class="hero__clients-label">Already running for</span>
+        <span class="hero__clients-names">${clientNames.join(" · ")}</span>
       </p>
 
       <a class="hero__cue" href="#session">

@@ -131,8 +131,42 @@ Deno.test("the front page renders with the full security header set", async () =
   assertEquals(response.headers.get("x-content-type-options"), "nosniff");
 
   const body = await response.text();
-  // The tagline is the eyebrow now, not the heading, but it is still on the page.
-  assertStringIncludes(body, escapeHtml(site.tagline));
+  // The tagline survives in the page title; the eyebrow carries its localised
+  // twin, which is a different string and asserted separately below.
+  assertStringIncludes(body, `<title>${escapeHtml(`${site.name} — ${site.tagline}`)}</title>`);
+});
+
+Deno.test("the hero is readable in English before any script runs", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  // The rotations replace text that is already there. If either first value is
+  // missing, a visitor without JavaScript gets an empty line where the sentence
+  // should be.
+  const first = site.taglines[0];
+  assertStringIncludes(body, `lang="${first.lang}"`);
+  assertStringIncludes(body, escapeHtml(first.text));
+  assertStringIncludes(body, "Websites that");
+  assertStringIncludes(body, escapeHtml(site.disciplines[0]));
+});
+
+Deno.test("the hero names the live clients, and not itself", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  const others = liveSites.filter((entry) => entry.host !== site.domain);
+  assert(others.length > 0, "the roster is only this site");
+  assertStringIncludes(body, escapeHtml(others.map((entry) => entry.name).join(" · ")));
+
+  // Citing itself as proof of itself is the failure mode worth naming.
+  const hero = body.slice(body.indexOf('class="hero"'), body.indexOf("</section>"));
+  const self = liveSites.find((entry) => entry.host === site.domain);
+  if (self !== undefined) {
+    assert(
+      !hero.includes(`>${escapeHtml(self.name)}<`),
+      "the hero offers itself as a reference",
+    );
+  }
 });
 
 Deno.test("the h1 is the name, and it is announced as a name", async () => {

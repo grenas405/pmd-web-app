@@ -301,6 +301,66 @@ Deno.test("the site behaves in a browser", async (t) => {
       });
     });
 
+    await t.step("changing language does not move the hero", async () => {
+      await withPage(harness, PHONE, async (page) => {
+        await page.goto(harness.origin);
+        await page.locator(".hero__tagline-text").waitFor();
+
+        // Every translation, not whichever two the rotation happens to reach.
+        // The first version of this step waited for the text to change once and
+        // passed by luck: the two it saw wrapped to the same number of rows, and
+        // it never noticed the 15px the title moved on the ones that did not.
+        const tops = await page.evaluate(() => {
+          const host = document.querySelector("[data-mode='fade']") as HTMLElement | null;
+          const text = document.querySelector(".hero__tagline-text");
+          const title = document.querySelector(".hero__title");
+          if (host === null || text === null || title === null) return null;
+
+          const words = JSON.parse(host.dataset.words ?? "[]") as { text: string }[];
+          const measured: Record<string, number> = {};
+          const restore = text.textContent;
+          for (const word of words) {
+            text.textContent = word.text;
+            measured[word.text] = title.getBoundingClientRect().top;
+          }
+          text.textContent = restore;
+          return measured;
+        });
+
+        assert(tops !== null, "the rotating tagline was not found");
+        const entries = Object.entries(tops);
+        assert(entries.length >= 2, "there is nothing to rotate through");
+
+        const [, first] = entries[0]!;
+        for (const [text, top] of entries) {
+          assert(
+            Math.abs(top - first) <= 1,
+            `"${text}" moves the hero title ${(top - first).toFixed(1)}px`,
+          );
+        }
+      });
+    });
+
+    await t.step("the rotated tagline carries its language", async () => {
+      await withPage(harness, PHONE, async (page) => {
+        await page.goto(harness.origin);
+        const text = page.locator(".hero__tagline-text");
+        await text.waitFor();
+
+        const before = await text.textContent();
+        await page.waitForFunction(
+          (was) => document.querySelector(".hero__tagline-text")?.textContent !== was,
+          before,
+          { timeout: 15000 },
+        );
+
+        // Without this a screen reader reads "Une Personne" with English
+        // phonemes, which is worse than not translating at all.
+        const lang = await text.getAttribute("lang");
+        assert(lang !== null && /^[a-z]{2}$/.test(lang), `lang was ${lang}`);
+      });
+    });
+
     await t.step("the name is painted, whatever the browser does with gradients", async () => {
       await withPage(harness, PHONE, async (page) => {
         await page.goto(harness.origin);

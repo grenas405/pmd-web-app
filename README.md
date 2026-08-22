@@ -375,7 +375,8 @@ still works:
 
 - `nav.js` — the full-screen menu, scrolled state, current-section marking
 - `hero.js` — brings the hero in line by line, the name letter by letter (all of it is in the HTML)
-- `typewriter.js` — the hero's rotating discipline (first word is in the HTML)
+- `typewriter.js` — the hero's two rotating lines: the benefit clause types, the tagline cross-fades
+  through five languages carrying its `lang` with it (both first values are in the HTML)
 - `reveal.js` — fades in sections that are below the fold, and only those
 - `contact.js` — upgrades the real `<form>` to `fetch`; falls back to a normal POST if anything goes
   wrong

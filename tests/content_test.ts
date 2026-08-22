@@ -16,7 +16,7 @@ import {
 } from "../src/content/thesis.ts";
 import { faq } from "../src/content/faq.ts";
 import { comparison, included, notIncluded, plan, sources } from "../src/content/pricing.ts";
-import { nav } from "../src/content/site.ts";
+import { nav, site } from "../src/content/site.ts";
 import {
   session,
   sessionPath,
@@ -273,5 +273,36 @@ Deno.test("the layer stack matches the map it illustrates", () => {
   for (const layer of layers) {
     assert(layer.name.trim().length > 0);
     assert(layer.gloss.trim().length > 0);
+  }
+});
+
+Deno.test("the hero rotation completes its sentence rather than listing categories", () => {
+  // The line reads "Websites that ___". A category noun dropped back in — the
+  // old "Business Websites" — makes it "Websites that Business Websites", which
+  // reads as a mistake and undoes the point of the rewrite.
+  for (const phrase of site.disciplines) {
+    assert(phrase.trim().length > 0, "an empty phrase would leave a dangling sentence");
+    assertEquals(
+      phrase[0],
+      phrase[0]?.toLowerCase(),
+      `"${phrase}" starts with a capital, so it is a title rather than a clause`,
+    );
+    assert(
+      !phrase.endsWith("."),
+      `"${phrase}" ends the sentence early; the prefix already opened it`,
+    );
+  }
+});
+
+Deno.test("every tagline carries a language, and English leads", () => {
+  // Without the language a screen reader reads French with English phonemes,
+  // which is worse than not translating at all.
+  assertEquals(site.taglines[0]?.lang, "en", "the served line must be the English one");
+  const seen = new Set<string>();
+  for (const tagline of site.taglines) {
+    assert(/^[a-z]{2}$/.test(tagline.lang), `"${tagline.lang}" is not a language code`);
+    assert(tagline.text.trim().length > 0, `${tagline.lang} has no text`);
+    assert(!seen.has(tagline.lang), `${tagline.lang} appears twice`);
+    seen.add(tagline.lang);
   }
 });

@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+### A hero that talks to the person buying
+
+The hero looked the part and still read like a CV. Three changes, all copy and one of them
+structural:
+
+- **The rotating line completes a sentence instead of listing categories.** "in Business Websites"
+  becomes "Websites that **book jobs while you sleep** / **answer while you're on a roof** / **turn
+  a quote into a customer** / **work with one bar of signal** / **you own outright**". Every phrase
+  is already argued elsewhere on the site — the signal one by the offline case in `narrative.ts`,
+  the last by the ownership promise in the trust line — because a hero must not sell what the
+  pricing page then has to walk back. A test fails if a capitalised title noun creeps back in, since
+  "Websites that Business Websites" is the regression waiting to happen.
+- **The tagline rotates through five languages.** English, Spanish, French, German and Latin, each
+  carrying its own `lang` so a screen reader pronounces "Une Personne" as French rather than as
+  English. Roughly a fifth of Oklahoma City speaks Spanish at home. The Latin is a coinage —
+  `Exemplaris Mutatio`, "a change of the model" — because Latin has no settled word for paradigm. It
+  cross-fades rather than types: two blinking carets in one viewport is noise, and the benefit line
+  has earned the eye.
+- **The hero names its clients.** Heavenly Roofing, Mercy Seat Ministries and Praxedis Technologies,
+  derived from `liveSites` with this site filtered out of its own proof by `host !== site.domain`. A
+  test fails if the hero ever offers itself as a reference.
+- **Oklahoma is said once.** The role line, a location line and the stat strip all named it within
+  four rows; the location line is gone and the city stays where it counts.
+
+Two layout faults were found and fixed while measuring rather than by reading:
+
+- **The hero jumped when the language changed.** The translations are not the same length — French
+  wraps to two rows where English fits one — so the name, buttons and cue moved with it. The eyebrow
+  now reserves the wrapped height. Two guesses (2.9em, 3.45em) were both wrong; 4.8em is the
+  measured answer. The first browser test written for this **passed by luck**, having sampled two
+  languages that happened to wrap the same way; it now forces every translation and measures each.
+- **The hero was always a masthead taller than the screen.** It asked for `100svh` while starting
+  _below_ a sticky masthead, so it overran by 74px — which is why its content sat low and the scroll
+  cue kept falling under the fold. It now asks for `calc(100svh - var(--masthead-h))`, and the
+  spacing compresses on short viewports so a 900px laptop shows the whole thing.
+
 ### The hero's name could vanish, and the aurora could push the page sideways
 
 Both reported from a phone, and neither reproduces in Chromium — no overflow at any width from 320px

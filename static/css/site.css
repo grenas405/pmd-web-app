@@ -73,6 +73,20 @@ html {
      tablet sitting just under 60rem that is enough to start matching the
      desktop breakpoint mid-interaction, which hides .masthead__toggle. */
   scrollbar-gutter: stable;
+
+  /*
+   * The masthead is sticky, so it sits in the flow and the hero starts beneath
+   * it. A hero of a full 100svh therefore runs off the bottom by exactly this
+   * much, which is why its content centred low and its scroll cue sat under the
+   * fold. Measured: 73.8px until the desktop nav appears, 83.7px after.
+   */
+  --masthead-h: 4.6rem;
+}
+
+@media (min-width: 60rem) {
+  html {
+    --masthead-h: 5.25rem;
+  }
 }
 
 body {
@@ -886,7 +900,7 @@ main {
   /* svh, not vh: on mobile Safari `100vh` is taller than the visible viewport,
      which pushes the scroll cue below the fold — the one element whose whole
      job is to be seen without scrolling. */
-  min-height: 100svh;
+  min-height: calc(100svh - var(--masthead-h));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -925,6 +939,20 @@ main {
 .hero__eyebrow {
   display: flex;
   align-items: center;
+  justify-content: center;
+  /*
+   * The line changes language every few seconds, and the translations are not
+   * the same length — French is a third longer than the English. Without a
+   * reserved height the whole hero, name included, jumps each time it wraps to
+   * a second row and back.
+   *
+   * The reserve is two rows' worth, because French wraps to two on every phone
+   * width and English does not. Measured rather than derived: the box is 52.7px
+   * wrapped and 37.9px unwrapped at this size, and 4.8em is the former. Earlier
+   * guesses of 2.9em and 3.45em both left the title jumping.
+   */
+  flex-wrap: wrap;
+  min-height: 4.8em;
   gap: 0.65rem;
   margin-bottom: clamp(1.25rem, 3vw, 1.75rem);
   font-family: var(--font-mono);
@@ -932,6 +960,17 @@ main {
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--text-mute);
+  text-wrap: balance;
+}
+
+.hero__tagline-text {
+  transition: opacity 420ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero__tagline-text {
+    transition: none;
+  }
 }
 
 .hero__eyebrow-dot {
@@ -1006,15 +1045,6 @@ main {
   color: var(--gold);
 }
 
-.hero__location {
-  margin-bottom: 0.75rem;
-  font-family: var(--font-mono);
-  font-size: clamp(0.62rem, 0.55rem + 0.35vw, 0.8rem);
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--text-mute);
-}
-
 .hero__stats {
   font-family: var(--font-mono);
   font-size: clamp(0.58rem, 0.52rem + 0.3vw, 0.72rem);
@@ -1045,10 +1075,13 @@ main {
   color: var(--text-soft);
 }
 
+/*
+ * "Websites that" is the subject of the sentence, not an aside. The old "in"
+ * was set in italic display face to get out of the way of the noun after it;
+ * this half carries as much meaning as the half that follows, so it is set to
+ * match and only dimmed enough to let the rotating clause lead.
+ */
 .hero__rotator-prefix {
-  font-family: var(--font-display);
-  font-variation-settings: "opsz" 24;
-  font-style: italic;
   color: var(--text-mute);
 }
 
@@ -1073,6 +1106,29 @@ main {
 .hero__trust strong {
   color: var(--gold);
   font-weight: 700;
+}
+
+.hero__clients {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: clamp(1.75rem, 4vh, 2.5rem);
+  font-family: var(--font-mono);
+  font-size: clamp(0.58rem, 0.52rem + 0.3vw, 0.72rem);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.hero__clients-label {
+  color: var(--text-mute);
+  opacity: 0.75;
+}
+
+/* The names are the point of the row, so they are the only part in gold. */
+.hero__clients-names {
+  color: var(--gold-deep);
 }
 
 .hero__cue {
@@ -1109,6 +1165,56 @@ main {
 
   50% {
     transform: translateY(4px);
+  }
+}
+
+/*
+ * Short viewports. The hero is a ladder of ten rows, and on a 667px phone the
+ * generous spacing that suits a laptop pushes the buttons towards the fold and
+ * the cue well past it. Everything here is spacing, not content: the same hero,
+ * standing closer together.
+ */
+@media (max-height: 940px) {
+  .hero {
+    padding-top: 5.25rem;
+    padding-bottom: 1.75rem;
+  }
+
+  .hero__eyebrow {
+    margin-bottom: 0.7rem;
+  }
+
+  .hero__divider {
+    margin-block: 0.8rem;
+  }
+
+  .hero__rotator {
+    margin-bottom: 1rem;
+  }
+
+  .hero__actions {
+    margin-bottom: 0.8rem;
+  }
+
+  .hero__trust {
+    margin-bottom: 1rem;
+  }
+
+  .hero__clients {
+    margin-bottom: 0.9rem;
+  }
+}
+
+/*
+ * On a small phone the hero cannot fit whatever the spacing, so the cue goes.
+ * Its only job is to say "there is more below", which a hero that already runs
+ * past the bottom of the screen says by itself. Better to drop the hint than to
+ * push the buttons down to keep it. Kept separate from the compression above
+ * because a laptop wants the tighter rhythm and still wants the cue.
+ */
+@media (max-height: 740px) {
+  .hero__cue {
+    display: none;
   }
 }
 

@@ -28,8 +28,27 @@ export const site = {
    * searches for a web developer, not for a software engineer.
    */
   role: "Web Developer for Oklahoma Businesses",
-  /** Spelled out, because "OKC" is not what a stranger types into a search. */
-  location: "Oklahoma City, Oklahoma · U.S.A.",
+  /**
+   * The tagline, in the languages Oklahoma City actually speaks.
+   *
+   * Kept to the short form on purpose: French is the longest at 40 characters
+   * against the English 30, and the eyebrow already spans most of a phone.
+   * Extending it to "In Web Development" would put German at 57 and break the
+   * line across three rows.
+   *
+   * `lang` is not decoration — without it a screen reader pronounces French
+   * with English phonemes. English is first because it is what the server
+   * renders and what stays if the rotation never runs.
+   */
+  taglines: [
+    { lang: "en", text: "One Person, One Paradigm Shift" },
+    { lang: "es", text: "Una Persona, Un Cambio de Paradigma" },
+    { lang: "fr", text: "Une Personne, Un Changement de Paradigme" },
+    { lang: "de", text: "Ein Mensch, Ein Paradigmenwechsel" },
+    // "A change of the model" — Latin has no settled word for paradigm in this
+    // sense, so this is a coinage rather than a translation.
+    { lang: "la", text: "Unus Homo, Una Exemplaris Mutatio" },
+  ],
   domain: "pedromdominguez.dev",
   tagline: "One Person. One Paradigm Shift.",
   description:
@@ -46,16 +65,24 @@ export const site = {
   regionName: "Oklahoma",
   country: "US",
   /**
-   * Rotated through by the hero typewriter. Short phrases read best, and each
-   * one names something a business owner would recognise wanting — not a
-   * technology they would have to look up.
+   * Rotated through by the hero typewriter, each one completing "Websites
+   * that …".
+   *
+   * Outcomes, not categories. "Business Websites" is what the work is called;
+   * "book jobs while you sleep" is what the owner is buying, and it is the
+   * second one they recognise as their own problem.
+   *
+   * Every phrase is already claimed elsewhere on the site — the signal line by
+   * the offline argument in narrative.ts, the last by the ownership promise in
+   * the trust line. The hero must not sell something the pricing page then has
+   * to walk back.
    */
   disciplines: [
-    "Business Websites",
-    "Quote & Booking Forms",
-    "Customer Portals",
-    "Software That Works Offline",
-    "Someone Who Answers",
+    "book jobs while you sleep",
+    "answer while you're on a roof",
+    "turn a quote into a customer",
+    "work with one bar of signal",
+    "you own outright",
   ],
 } as const;
 
