@@ -26,6 +26,7 @@ import {
   sources as thesisSources,
 } from "../src/content/thesis.ts";
 import { createContactStore } from "../src/admin/contact.ts";
+import { snippets } from "../src/content/rain.ts";
 
 const ORIGIN = "https://pedromdominguez.dev";
 
@@ -809,4 +810,25 @@ Deno.test("the hero says Español with its tilde", async () => {
   // aimed at the readers it is there to reach.
   assertStringIncludes(body, "Español");
   assert(!body.includes("Espanol"), "Español lost its tilde somewhere");
+});
+
+Deno.test("the background is complete before any script runs", async () => {
+  const app = await buildApp();
+  const body = await (await app(get("/"), "203.0.113.1")).text();
+
+  // The canvas is served empty and the snippets travel with it, the same way
+  // the transcript and the typewriter words do.
+  assertStringIncludes(body, 'class="sky__rain"');
+  // The serialised value, not each line: the snippets are JSON first and HTML
+  // second, so an inner quote reaches the page as \&quot; and a plain
+  // escapeHtml() of the line would never match.
+  assertStringIncludes(body, escapeHtml(JSON.stringify(snippets)));
+
+  // And the starfield stays. It is the floor: without JavaScript, on a failed
+  // import, or under reduced motion it is the background, and deleting it would
+  // leave a flat gradient behind every page in those three cases.
+  assertStringIncludes(body, 'class="sky__stars"');
+
+  // The whole layer is decoration and must never be announced.
+  assertStringIncludes(body, '<div class="sky" aria-hidden="true">');
 });

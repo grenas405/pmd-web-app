@@ -341,6 +341,70 @@ Deno.test("the site behaves in a browser", async (t) => {
       });
     });
 
+    await t.step("the background rain runs, and hands over only when it draws", async () => {
+      await withPage(harness, LAPTOP, async (page) => {
+        await page.goto(harness.origin);
+
+        // data-rain is set after the first painted frame, not before, so the
+        // starfield never steps back for a canvas that turned out not to work.
+        await page.waitForFunction(
+          () => document.querySelector(".sky")?.hasAttribute("data-rain"),
+          { timeout: 15000 },
+        );
+
+        // The handover is an attribute; the visible swap is a 900ms cross-fade.
+        // Measuring straight after the attribute lands reads the start of it.
+        await page.waitForFunction(
+          () =>
+            Number(
+              globalThis.getComputedStyle(document.querySelector(".sky__rain")!).opacity,
+            ) > 0.9,
+          { timeout: 5000 },
+        );
+
+        const state = await page.evaluate(() => {
+          const canvas = document.querySelector(".sky__rain") as HTMLCanvasElement;
+          const stars = document.querySelector(".sky__stars")!;
+          return {
+            painted: canvas.width > 0 && canvas.height > 0,
+            rain: Number(globalThis.getComputedStyle(canvas).opacity),
+            stars: Number(globalThis.getComputedStyle(stars).opacity),
+          };
+        });
+
+        assert(state.painted, "the canvas has no backing store");
+        assert(state.rain > 0.9, `the rain is at ${state.rain}`);
+        assert(state.stars < 0.1, `the starfield did not step back (${state.stars})`);
+      });
+    });
+
+    await t.step("reduced motion keeps the starfield and never starts the rain", async () => {
+      const context = await harness.browser.newContext({
+        viewport: LAPTOP,
+        reducedMotion: "reduce",
+      });
+      try {
+        const page = await context.newPage();
+        await page.goto(harness.origin);
+        // Long enough that the rain would have handed over by now if it were
+        // going to. The floor matters: deleting the starfield outright would
+        // leave this visitor looking at a flat gradient.
+        await page.waitForTimeout(4000);
+
+        const state = await page.evaluate(() => ({
+          handed: document.querySelector(".sky")?.hasAttribute("data-rain") ?? false,
+          stars: Number(
+            globalThis.getComputedStyle(document.querySelector(".sky__stars")!).opacity,
+          ),
+        }));
+
+        assertEquals(state.handed, false, "the rain started despite reduced motion");
+        assert(state.stars > 0.5, `the starfield is at ${state.stars} with nothing replacing it`);
+      } finally {
+        await context.close();
+      }
+    });
+
     await t.step("the rotating slogan never resizes its box", async () => {
       await withPage(harness, PHONE, async (page) => {
         await page.goto(harness.origin);

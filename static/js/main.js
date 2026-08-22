@@ -43,13 +43,18 @@ attempt("layers", initLayers);
 // Only ever finds its canvas on the sign-in page; everywhere else it returns.
 attempt("code rain", initCodeRain);
 
-// The night sky is the heaviest enhancement and the least important, so it is
-// loaded on its own, after everything else, and only when it will be used.
+// The two background layers are the heaviest enhancements and the least
+// important, so they are loaded on their own, after everything else, and only
+// when they will be used. The starfield the server drew stays until they do.
 if (!globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-  const load = () =>
-    import("./sky.js")
+  const load = () => {
+    void import("./rain.js")
+      .then((module) => module.initRain())
+      .catch((error) => console.warn("[pmd] code rain unavailable", error));
+    return import("./sky.js")
       .then((module) => module.initSky())
       .catch((error) => console.warn("[pmd] sky unavailable", error));
+  };
 
   if ("requestIdleCallback" in globalThis) {
     globalThis.requestIdleCallback(load, { timeout: 2500 });

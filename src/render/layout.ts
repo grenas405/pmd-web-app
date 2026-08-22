@@ -9,6 +9,7 @@ import { escapeJsonForScript, type Html, html, raw } from "./html.ts";
 import type { RenderContext } from "./context.ts";
 import { absoluteUrl, nav, site } from "../content/site.ts";
 import { markSvg } from "./marks.ts";
+import { snippets } from "../content/rain.ts";
 import { scriptHash } from "../http/security.ts";
 
 export interface PageMeta {
@@ -203,11 +204,15 @@ function footer(context: RenderContext): Html {
   `;
 }
 
-/** Ambient background: static CSS starfield plus a layer JS may animate. */
+/** Ambient background: static CSS starfield plus two layers JS may animate. */
 function sky(): Html {
   return html`
     <div class="sky" aria-hidden="true">
+      <!-- The starfield is the floor, not a leftover. rain.js hides it only once
+          it is actually drawing; without JavaScript, on a failed import, or under
+          reduced motion this is the background, and it is a good one. -->
       <div class="sky__stars"></div>
+      <canvas class="sky__rain" data-rain-snippets="${JSON.stringify(snippets)}"></canvas>
       <div class="sky__glow"></div>
       <div class="sky__meteors" data-meteor-field></div>
     </div>

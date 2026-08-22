@@ -385,6 +385,8 @@ still works:
   first transcript is already in the HTML)
 - `splash.js` — opens the launch-offer dialog, once, to a visitor who is actually reading
 - `layers.js` — reveals the six-layer stack on the landing page (the diagram is already in the HTML)
+- `rain.js` — the code rain behind every page: columns of real `@std/http` snippets, drawn from
+  `src/content/rain.ts` (the served starfield stays until it has painted a frame)
 - `coderain.js` — the scrolling pseudo-code behind the admin sign-in, and nowhere else
 
 `sky.js` — the gold shooting stars — is dynamically imported during idle time, and never at all when

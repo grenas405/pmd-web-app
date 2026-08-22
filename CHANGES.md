@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+### The stack, falling behind the page
+
+`heavenlyroofingllc`'s tech-stack page opens with a Matrix rain on a canvas — columns of characters
+descending with a bright head and a fading tail. The mechanism is worth taking; the specifics are
+not, so the emerald became gold from this site's own tokens, and the random katakana became
+something better.
+
+- **What falls is real code.** Each column holds one snippet from `src/content/rain.ts` and shows
+  consecutive characters of it, so reading down a column gives an actual line of `@std/http` rather
+  than confetti. The decoration ends up making the same argument the rest of the page makes.
+- **And the snippets have to stay real.** `tests/rain_test.ts` imports every symbol they name —
+  `getCookies` from `@std/http/cookie`, `serveFile`, `encodeHex`, `ContactSchema`, `inquiryKey` —
+  from the place the snippet says it comes from. A specifier that stops existing or a symbol that
+  was never exported fails `deno check` before a single test runs. A site that asks to be trusted on
+  checkable claims should not put invented API in its own wallpaper.
+- **The starfield stays as the floor.** `rain.js` sets `data-rain` on `.sky` only after it has
+  painted a frame, and CSS cross-fades the two. Without JavaScript, on a failed import, or under
+  reduced motion, today's background is still there — deleting it outright would have left a flat
+  gradient behind every page in three cases where nothing was wrong.
+- **Capped at 30fps**, idle while the tab is hidden, `devicePixelRatio` capped at 2, and never
+  imported at all when motion is reduced. The source runs uncapped `requestAnimationFrame`; this is
+  a full-viewport canvas on every page, and 60fps of it is a phone battery for no visible gain.
+
+Two faults found by looking at it rather than by reading it. The source's speeds carried across
+unchanged looked broken at half its frame rate — six seconds after load most columns were still
+above the fold — and columns respawning up to 1080px above the viewport went dark for half a minute
+at a time. And the tail is drawn _upward_ from the head, so advancing the snippet index with it put
+later characters higher up: `@std/http` arrived on screen as `ptth/dts@`. Walking the index
+backwards as the tail walks up is what makes a column read downward.
+
 ### Slogans that take a position, and resolve out of noise
 
 The rotating clause was specific, which was right, but folksy — "book jobs while you sleep" sounds
